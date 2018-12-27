@@ -2,13 +2,13 @@ pragma solidity >=0.5.0 <0.6.0;
 
 import "ds-test/test.sol";
 
-import "./DsDelay.sol";
+import "./delay.sol";
 
 contract DsDelayTest is DSTest {
-    DsDelay delay;
+    DSDelay delay;
 
     function setUp() public {
-        delay = new DsDelay();
+        delay = new DSDelay(1);
     }
 
     function testFail_basic_sanity() public {

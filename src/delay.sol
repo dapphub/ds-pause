@@ -45,16 +45,35 @@ contract DSDelay {
         delete queue[id];
     }
 
-    function execute(bytes32 id) public {
+    function execute(bytes32 id) public payable returns (bytes memory response) {
         Execution memory entry = queue[id];
 
         require(now > freezeUntil);
         require(now > entry.timestamp + delay);
 
+        require(entry.guy != address(0));
         require(entry.done == false);
         entry.done = true;
 
-        entry.guy.delegatecall(entry.data);
+        address target = entry.guy;
+        bytes memory data = entry.data;
+
+        // call contract in current context
+        assembly {
+            let succeeded := delegatecall(sub(gas, 5000), target, add(data, 0x20), mload(data), 0, 0)
+            let size := returndatasize
+
+            response := mload(0x40)
+            mstore(0x40, add(response, and(add(add(size, 0x20), 0x1f), not(0x1f))))
+            mstore(response, size)
+            returndatacopy(add(response, 0x20), 0, size)
+
+            switch iszero(succeeded)
+            case 1 {
+                // throw if delegatecall failed
+                revert(add(response, 0x20), size)
+            }
+        }
     }
 
     function freeze(uint timestamp) public auth {

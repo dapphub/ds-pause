@@ -12,7 +12,6 @@ contract DSDelay {
         address  guy;
         bytes    data;
         uint     timestamp;
-        bool     done;
     }
 
     mapping (bytes32 => Execution) public queue;
@@ -35,7 +34,6 @@ contract DSDelay {
         entry.guy = guy;
         entry.data = data;
         entry.timestamp = now;
-        entry.done = false;
 
         return id;
     }
@@ -46,14 +44,13 @@ contract DSDelay {
     }
 
     function execute(bytes32 id) public payable returns (bytes memory response) {
-        Execution memory entry = queue[id];
-
         require(now > freezeUntil);
+
+        Execution memory entry = queue[id];
         require(now > entry.timestamp + delay);
 
         require(entry.guy != address(0));
-        require(entry.done == false);
-        entry.done = true;
+        delete queue[id];
 
         address target = entry.guy;
         bytes memory data = entry.data;

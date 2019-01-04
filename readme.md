@@ -25,7 +25,8 @@ This contract makes use of a simple multi-owner auth scheme. Owners can add (`re
 
 **`execute(bytes32 id) returns (bytes memory response)`**
 
-- Executes the given function call as long as the delay period has passed.
+- Executes the given function call (using `delegatecall`) as long as the delay period has passed.
+- Returns the `delegatecall` output
 
 **`freeze(uint256 timestamp) auth`**
 

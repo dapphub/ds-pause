@@ -1,6 +1,6 @@
 pragma solidity >=0.5.0 <0.6.0;
 
-contract DSDelay {
+contract DSPause {
     // --- Auth ---
     mapping (address => uint) public wards;
     function rely(address guy) public auth { wards[guy] = 1; }

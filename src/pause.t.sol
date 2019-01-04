@@ -2,7 +2,7 @@ pragma solidity >=0.5.0 <0.6.0;
 
 import "ds-test/test.sol";
 
-import "./delay.sol";
+import "./pause.sol";
 
 contract Hevm {
     function warp(uint256) public;
@@ -14,8 +14,8 @@ contract Target {
     }
 }
 
-contract DsDelayTest is DSTest {
-    DSDelay delay;
+contract DSPauseTest is DSTest {
+    DSPause pause;
     Target target;
     Hevm hevm;
 
@@ -28,19 +28,19 @@ contract DsDelayTest is DSTest {
         hevm.warp(start);
 
         target = new Target();
-        delay = new DSDelay(wait);
+        pause = new DSPause(wait);
     }
 
-    function testFail_execute_delay_not_passed() public {
-        bytes32 id = delay.enqueue(address(target), abi.encode(0));
-        delay.execute(id);
+    function testFail_execute_pause_not_passed() public {
+        bytes32 id = pause.enqueue(address(target), abi.encode(0));
+        pause.execute(id);
     }
 
-    function test_execute_delay_passed() public {
-        bytes32 id = delay.enqueue(address(target), abi.encodeWithSignature("getBytes32()"));
+    function test_execute_pause_passed() public {
+        bytes32 id = pause.enqueue(address(target), abi.encodeWithSignature("getBytes32()"));
         hevm.warp(ready);
 
-        bytes memory response = delay.execute(id);
+        bytes memory response = pause.execute(id);
 
         bytes32 response32;
         assembly {

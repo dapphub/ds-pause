@@ -10,23 +10,24 @@ This contract makes use of a simple multi-owner auth scheme. Owners can add (`re
 
 ## Interface
 
-**`schedule(address guy, bytes memory data)`**
+**`constructor(uint256 delay)`**
+
+- Initializes a new instance of the contract with a delay in ms
+
+**`schedule(address guy, bytes memory data) auth returns (bytes32 id)`**
 
 - Schedule a call with `data` calldata to address `guy`.
 - Returns the id needed to execute or cancel the call.
-- Can only be called by owners.
 
-**`cancel(bytes32 id)`**
+**`cancel(bytes32 id) auth`**
 
-- Cancels an execution.
-- Can only be called by owners.
+- Cancels a scheduled execution.
 
-**`execute(bytes32 id)`**
+**`execute(bytes32 id) returns (bytes memory response)`**
 
-- Delegatecalls into the target contract with the given calldata.
-- Can be called by anyone.
+- Executes the given function call as long as the delay period has passed.
 
-**`freeze(uint256 timestamp)`**
+**`freeze(uint256 timestamp) auth`**
 
 - Nothing can be scheduled, canceled or executed until `timestamp`.
-- Auth can still be changed. This is intended to allow graceful ownership migrations.
+- Owners can still be added and removed. This is to allow graceful ownership migrations.

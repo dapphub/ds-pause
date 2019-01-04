@@ -11,7 +11,7 @@ contract DSDelay {
     struct Execution {
         address  guy;
         bytes    data;
-        uint     timestamp;
+        uint256  timestamp;
     }
 
     mapping (bytes32 => Execution) public queue;

@@ -46,12 +46,12 @@ contract DSPauseTest is DSTest {
         pause = new DSPause(wait);
     }
 
-    function testFail_execute_pause_not_passed() public {
+    function testFail_execute_delay_not_passed() public {
         bytes32 id = pause.schedule(address(target), abi.encode(0));
         pause.execute(id);
     }
 
-    function test_execute_pause_passed() public {
+    function test_execute_delay_passed() public {
         bytes32 id = pause.schedule(address(target), abi.encodeWithSignature("getBytes32()"));
         hevm.warp(ready);
 
@@ -62,5 +62,13 @@ contract DSPauseTest is DSTest {
             response32 := mload(add(response, 32))
         }
         assertEq(response32, bytes32("Hello"));
+    }
+
+    function testFail_execute_twice() public {
+        bytes32 id = pause.schedule(address(target), abi.encodeWithSignature("getBytes32()"));
+        hevm.warp(ready);
+
+        pause.execute(id);
+        pause.execute(id);
     }
 }

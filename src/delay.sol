@@ -28,6 +28,8 @@ contract DSDelay {
     // --- Logic ---
     function enqueue(address guy, bytes memory data) public auth returns (bytes32 id) {
         require(now > freezeUntil);
+        require(guy != address(0));
+
         id = keccak256(abi.encode(guy, data, now));
 
         Execution storage entry = queue[id];

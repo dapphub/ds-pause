@@ -58,6 +58,25 @@ contract Test is DSTest {
     }
 }
 
+contract Constructor is DSTest {
+
+    function test_delay_set() public {
+        DSPause pause = new DSPause(100);
+        assertEq(pause.delay(), 100);
+    }
+
+    function test_creator_is_owner() public {
+        DSPause pause = new DSPause(100);
+        assertEq(pause.wards(address(this)), 1);
+    }
+
+    function test_not_frozen() public {
+        DSPause pause = new DSPause(100);
+        assertEq(pause.freezeUntil(), 0);
+    }
+
+}
+
 contract Schedule is Test {
 
     function testFail_cannot_schedule_zero_address() public {

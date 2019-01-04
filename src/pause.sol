@@ -41,7 +41,7 @@ contract DSPause {
     }
 
     // --- Logic ---
-    function enqueue(address guy, bytes memory data) public auth returns (bytes32 id) {
+    function schedule(address guy, bytes memory data) public auth returns (bytes32 id) {
         require(now > freezeUntil);
         require(guy != address(0));
 

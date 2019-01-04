@@ -47,12 +47,12 @@ contract DSPauseTest is DSTest {
     }
 
     function testFail_execute_pause_not_passed() public {
-        bytes32 id = pause.enqueue(address(target), abi.encode(0));
+        bytes32 id = pause.schedule(address(target), abi.encode(0));
         pause.execute(id);
     }
 
     function test_execute_pause_passed() public {
-        bytes32 id = pause.enqueue(address(target), abi.encodeWithSignature("getBytes32()"));
+        bytes32 id = pause.schedule(address(target), abi.encodeWithSignature("getBytes32()"));
         hevm.warp(ready);
 
         bytes memory response = pause.execute(id);

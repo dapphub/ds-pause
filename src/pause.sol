@@ -34,7 +34,7 @@ contract DSPause {
     uint public freezeUntil;
 
     // --- Init ---
-    constructor(uint delay_) public {
+    constructor(uint256 delay_) public {
         wards[msg.sender] = 1;
         delay = delay_;
         freezeUntil = 0;

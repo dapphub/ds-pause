@@ -90,7 +90,7 @@ contract DSPause {
         }
     }
 
-    function freeze(uint timestamp) public auth {
+    function freeze(uint256 timestamp) public auth {
         freezeUntil = timestamp;
     }
 }

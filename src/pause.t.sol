@@ -29,10 +29,20 @@ contract Target {
     }
 }
 
-contract DSPauseTest is DSTest {
+contract Stranger {
+    function call(address target, bytes memory data) public returns (bytes memory) {
+        (bool success, bytes memory result) = target.call(data);
+
+        require(success);
+        return result;
+    }
+}
+
+contract ExecuteTest is DSTest {
     DSPause pause;
     Target target;
     Hevm hevm;
+    Stranger stranger;
 
     uint256 start = 1;
     uint256 wait  = 1;
@@ -44,10 +54,19 @@ contract DSPauseTest is DSTest {
 
         target = new Target();
         pause = new DSPause(wait);
+        stranger = new Stranger();
     }
 
-    function testFail_execute_delay_not_passed() public {
+    function testFail_delay_not_passed() public {
         bytes32 id = pause.schedule(address(target), abi.encode(0));
+        pause.execute(id);
+    }
+
+    function testFail_double_execution() public {
+        bytes32 id = pause.schedule(address(target), abi.encodeWithSignature("getBytes32()"));
+        hevm.warp(ready);
+
+        pause.execute(id);
         pause.execute(id);
     }
 
@@ -64,11 +83,10 @@ contract DSPauseTest is DSTest {
         assertEq(response32, bytes32("Hello"));
     }
 
-    function testFail_execute_twice() public {
+    function test_call_from_non_owner() public {
         bytes32 id = pause.schedule(address(target), abi.encodeWithSignature("getBytes32()"));
         hevm.warp(ready);
 
-        pause.execute(id);
-        pause.execute(id);
+        stranger.call(address(pause), abi.encodeWithSignature("execute(bytes32)", id));
     }
 }

@@ -55,11 +55,6 @@ contract DSPause {
         return id;
     }
 
-    function cancel(bytes32 id) public auth {
-        require(now > freezeUntil);
-        delete queue[id];
-    }
-
     function execute(bytes32 id) public payable returns (bytes memory response) {
         require(now > freezeUntil);
 
@@ -88,6 +83,11 @@ contract DSPause {
                 revert(add(response, 0x20), size)
             }
         }
+    }
+
+    function cancel(bytes32 id) public auth {
+        require(now > freezeUntil);
+        delete queue[id];
     }
 
     function freeze(uint256 timestamp) public auth {

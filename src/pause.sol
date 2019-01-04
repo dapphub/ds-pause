@@ -17,7 +17,7 @@ pragma solidity >=0.5.0 <0.6.0;
 
 contract DSPause {
     // --- Auth ---
-    mapping (address => uint) public wards;
+    mapping (address => uint256) public wards;
     function rely(address guy) public auth { wards[guy] = 1; }
     function deny(address guy) public auth { wards[guy] = 0; }
     modifier auth { require(wards[msg.sender] == 1); _; }
@@ -30,8 +30,8 @@ contract DSPause {
     }
 
     mapping (bytes32 => Execution) public queue;
-    uint public delay;
-    uint public freezeUntil;
+    uint256 public delay;
+    uint256 public freezeUntil;
 
     // --- Init ---
     constructor(uint256 delay_) public {

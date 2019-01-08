@@ -89,6 +89,36 @@ contract Constructor is DSTest {
 
 }
 
+contract Auth is Test {
+
+    function testFail_call_rely_from_non_owner() public {
+        bytes memory data = abi.encodeWithSignature("rely(address)", address(stranger));
+        stranger.call(address(pause), data);
+    }
+
+    function testFail_call_deny_from_non_owner() public {
+        bytes memory data = abi.encodeWithSignature("deny(address)", address(this));
+        stranger.call(address(pause), data);
+    }
+
+    function test_call_wards_from_non_owner() public {
+        bytes memory data = abi.encodeWithSignature("wards(address)", address(this));
+        bytes memory response = stranger.call(address(pause), data);
+        assertEq0(response, "0");
+    }
+
+    function test_adding_removing_owners() public {
+        assertEq(pause.wards(address(stranger)), 0);
+
+        pause.rely(address(stranger));
+        assertEq(pause.wards(address(stranger)), 1);
+
+        pause.deny(address(stranger));
+        assertEq(pause.wards(address(stranger)), 0);
+    }
+
+}
+
 contract Schedule is Test {
 
     function testFail_cannot_schedule_zero_address() public {

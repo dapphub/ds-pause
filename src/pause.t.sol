@@ -175,3 +175,44 @@ contract Cancel is Test {
     }
 
 }
+
+contract Freeze is Test {
+
+    function testFail_call_from_non_owner() public {
+        bytes memory data = abi.encodeWithSignature("freeze(uint256)", 5);
+        stranger.call(address(pause), data);
+    }
+
+    function testFail_freeze_schedule() public {
+        pause.freeze(100);
+        pause.schedule(address(target), abi.encode(0));
+    }
+
+    function testFail_freeze_execute() public {
+        bytes32 id = pause.schedule(address(target), abi.encode(0));
+        pause.freeze(100);
+        pause.execute(id);
+    }
+
+    function testFail_freeze_cancel() public {
+        bytes32 id = pause.schedule(address(target), abi.encode(0));
+        pause.freeze(100);
+        pause.cancel(id);
+    }
+
+    function testFail_freeze_freeze() public {
+        pause.freeze(100);
+        pause.freeze(1000);
+    }
+
+    function test_auth_not_frozen() public {
+        pause.freeze(100);
+
+        pause.rely(address(stranger));
+        assertEq(pause.wards(address(stranger)), 1);
+
+        pause.deny(address(stranger));
+        assertEq(pause.wards(address(stranger)), 0);
+    }
+
+}

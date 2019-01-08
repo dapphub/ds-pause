@@ -19,6 +19,10 @@ import "ds-test/test.sol";
 
 import "./pause.sol";
 
+// ------------------------------------------------------------------
+// Test Harness
+// ------------------------------------------------------------------
+
 contract Hevm {
     function warp(uint256) public;
 }
@@ -37,6 +41,10 @@ contract Stranger {
         return result;
     }
 }
+
+// ------------------------------------------------------------------
+// Common Setup
+// ------------------------------------------------------------------
 
 contract Test is DSTest {
     DSPause pause;
@@ -57,6 +65,10 @@ contract Test is DSTest {
         stranger = new Stranger();
     }
 }
+
+// ------------------------------------------------------------------
+// Tests
+// ------------------------------------------------------------------
 
 contract Constructor is DSTest {
 
@@ -83,8 +95,9 @@ contract Schedule is Test {
         pause.schedule(address(0), abi.encode(0));
     }
 
-    function testFail_cannot_be_called_by_non_owner() public {
-        stranger.call(address(pause), abi.encodeWithSignature("schedule(address,bytes)", address(0), abi.encode(0)));
+    function testFail_call_from_non_owner() public {
+        bytes memory data = abi.encodeWithSignature("schedule(address,bytes)", address(target), abi.encode(0));
+        stranger.call(address(pause), data);
     }
 
     function test_insertion() public {

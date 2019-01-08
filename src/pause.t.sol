@@ -136,3 +136,29 @@ contract Execute is Test {
     }
 
 }
+
+contract Cancel is Test {
+
+    function testFail_call_from_non_owner() public {
+        bytes32 id = pause.schedule(address(target), abi.encodeWithSignature("getBytes32()"));
+        hevm.warp(ready);
+
+        bytes memory data = abi.encodeWithSignature("cancel(bytes32)", id);
+        stranger.call(address(pause), data);
+    }
+
+    function test_cancel_scheduled_execution() public {
+        bytes32 id = pause.schedule(address(target), abi.encodeWithSignature("getBytes32()"));
+        hevm.warp(ready);
+
+        pause.cancel(id);
+
+        (address guy, bytes memory data, uint256 timestamp) = pause.queue(id);
+        bytes memory emptyBytes = "";
+
+        assertEq(guy, address(0));
+        assertEq0(data, emptyBytes);
+        assertEq(timestamp, 0);
+    }
+
+}

@@ -91,6 +91,7 @@ contract DSPause {
     }
 
     function freeze(uint256 timestamp) public auth {
+        require(now > freezeUntil);
         freezeUntil = timestamp;
     }
 }

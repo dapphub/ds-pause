@@ -53,7 +53,7 @@ contract Test is DSTest {
     Stranger stranger;
 
     uint256 start = 1;
-    uint256 wait  = 1;
+    uint256 delay = 1;
     uint256 ready = 3;
 
     function setUp() public {
@@ -61,7 +61,7 @@ contract Test is DSTest {
         hevm.warp(start);
 
         target = new Target();
-        pause = new DSPause(wait);
+        pause = new DSPause(delay);
         stranger = new Stranger();
     }
 }

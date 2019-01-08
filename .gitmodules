@@ -4,3 +4,6 @@
 [submodule "lib/ds-spell"]
 	path = lib/ds-spell
 	url = https://github.com/dapphub/ds-spell
+[submodule "lib/ds-chief"]
+	path = lib/ds-chief
+	url = https://github.com/dapphub/ds-chief

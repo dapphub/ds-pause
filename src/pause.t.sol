@@ -202,10 +202,8 @@ contract Cancel is Test {
         pause.cancel(id);
 
         (address guy, bytes memory data, uint256 timestamp) = pause.queue(id);
-        bytes memory emptyBytes = "";
-
         assertEq(guy, address(0));
-        assertEq0(data, emptyBytes);
+        assertEq0(data, new bytes(0));
         assertEq(timestamp, 0);
     }
 

@@ -104,7 +104,12 @@ contract Auth is Test {
     function test_call_wards_from_non_owner() public {
         bytes memory data = abi.encodeWithSignature("wards(address)", address(this));
         bytes memory response = stranger.call(address(pause), data);
-        assertEq0(response, "0");
+
+        uint256 responseUint;
+        assembly {
+            responseUint := mload(add(response, 32))
+        }
+        assertEq(responseUint, 1);
     }
 
     function test_adding_removing_owners() public {

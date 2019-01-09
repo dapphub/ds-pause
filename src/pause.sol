@@ -20,7 +20,10 @@ contract DSPause {
     mapping (address => uint256) public wards;
     function rely(address guy) public auth { wards[guy] = 1; }
     function deny(address guy) public auth { wards[guy] = 0; }
-    modifier auth { require(wards[msg.sender] == 1); _; }
+    modifier auth {
+        require(wards[msg.sender] == 1, "ds-pause: unauthorized");
+        _;
+    }
 
     // --- Data ---
     struct Execution {
@@ -42,8 +45,8 @@ contract DSPause {
 
     // --- Logic ---
     function schedule(address guy, bytes memory data) public auth returns (bytes32 id) {
-        require(now > freezeUntil);
-        require(guy != address(0));
+        require(now > freezeUntil, "ds-pause: frozen");
+        require(guy != address(0), "ds-pause: cannot schedule calls to zero address");
 
         id = keccak256(abi.encode(guy, data, now));
 
@@ -56,12 +59,12 @@ contract DSPause {
     }
 
     function execute(bytes32 id) public payable returns (bytes memory response) {
-        require(now > freezeUntil);
+        require(now > freezeUntil, "ds-pause: frozen");
 
         Execution memory entry = queue[id];
-        require(now > entry.timestamp + delay);
+        require(now > entry.timestamp + delay, "ds-pause: delay not passed");
 
-        require(entry.guy != address(0));
+        require(entry.guy != address(0), "ds-pause: no scheduled execution for given id");
         delete queue[id];
 
         address target = entry.guy;
@@ -86,12 +89,12 @@ contract DSPause {
     }
 
     function cancel(bytes32 id) public auth {
-        require(now > freezeUntil);
+        require(now > freezeUntil, "ds-pause: frozen");
         delete queue[id];
     }
 
     function freeze(uint256 timestamp) public auth {
-        require(now > freezeUntil);
+        require(now > freezeUntil, "ds-pause: frozen");
         freezeUntil = timestamp;
     }
 }

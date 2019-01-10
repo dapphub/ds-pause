@@ -238,14 +238,14 @@ contract Freeze is Test {
         pause.freeze(1000);
     }
 
-    function test_auth_not_frozen() public {
+    function testFail_freeze_rely() public {
         pause.freeze(100);
-
         pause.rely(address(stranger));
-        assertEq(pause.wards(address(stranger)), 1);
+    }
 
+    function testFail_freeze_deny() public {
+        pause.freeze(100);
         pause.deny(address(stranger));
-        assertEq(pause.wards(address(stranger)), 0);
     }
 
 }

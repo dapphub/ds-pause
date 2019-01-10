@@ -18,8 +18,16 @@ pragma solidity >=0.5.0 <0.6.0;
 contract DSPause {
     // --- Auth ---
     mapping (address => uint256) public wards;
-    function rely(address guy) public auth { wards[guy] = 1; }
-    function deny(address guy) public auth { wards[guy] = 0; }
+
+    function rely(address guy) public auth {
+        require(now > freezeUntil, "ds-pause: frozen");
+        wards[guy] = 1;
+    }
+    function deny(address guy) public auth {
+        require(now > freezeUntil, "ds-pause: frozen");
+        wards[guy] = 0;
+    }
+
     modifier auth {
         require(wards[msg.sender] == 1, "ds-pause: unauthorized");
         _;

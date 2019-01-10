@@ -31,4 +31,4 @@ This contract makes use of a simple multi-owner auth scheme. Owners can add (`re
 **`freeze(uint256 timestamp) auth`**
 
 - Nothing can be scheduled, canceled or executed until `timestamp`.
-- Owners can still be added and removed. This is to allow graceful ownership migrations.
+- Owners cannot be added or removed while frozen.

@@ -58,10 +58,11 @@ contract DSPause {
 
         id = keccak256(abi.encode(guy, data, now));
 
-        Execution storage entry = queue[id];
-        entry.guy = guy;
-        entry.data = data;
-        entry.timestamp = now;
+        queue[id] = Execution({
+            guy: guy,
+            data: data,
+            timestamp: now
+        });
 
         return id;
     }

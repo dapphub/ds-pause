@@ -10,3 +10,6 @@
 [submodule "lib/ds-token"]
 	path = lib/ds-token
 	url = https://github.com/dapphub/ds-token
+[submodule "lib/ds-proxy"]
+	path = lib/ds-proxy
+	url = https://github.com/dapphub/ds-proxy

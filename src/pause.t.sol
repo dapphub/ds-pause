@@ -222,8 +222,9 @@ contract Freeze is Test {
     }
 
     function testFail_freeze_execute() public {
-        bytes32 id = pause.schedule(address(target), abi.encode(0));
+        bytes32 id = pause.schedule(address(target), abi.encodeWithSignature("getBytes32()"));
         pause.freeze(100);
+        hevm.warp(ready);
         pause.execute(id);
     }
 

@@ -32,3 +32,8 @@ This contract makes use of a simple multi-owner auth scheme. Owners can add (`re
 
 - Nothing can be scheduled, canceled or executed until `timestamp`.
 - Owners cannot be added or removed while frozen.
+
+## Tests
+
+- [`pause.t.sol`](./pause.t.sol): unit tests
+- [`integration.t.sol`](./integration.t.sol): basic usage example / integation tests

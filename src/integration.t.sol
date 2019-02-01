@@ -32,7 +32,6 @@ contract Hevm {
 }
 
 contract User {
-
     DSChief chief;
     DSToken gov;
     DSPause pause;
@@ -69,7 +68,6 @@ contract User {
         gov.approve(address(chief));
         chief.lock(amount);
     }
-
 }
 
 contract Target {
@@ -89,15 +87,35 @@ contract Target {
 }
 
 // ------------------------------------------------------------------
-// Proxy Scripts
+// Interfaces
 // ------------------------------------------------------------------
 
+contract AuthLike {
+    function rely(address) public;
+    function deny(address) public;
+    function wards(address) public;
+}
+
+// ------------------------------------------------------------------
+// Proxy Scripts
+// ------------------------------------------------------------------
 
 contract Scheduler {
     function schedule(DSPause pause, address guy, bytes memory data) public returns (bytes32) {
         return pause.schedule(guy, data);
     }
 }
+
+contract Ownership {
+    function swap(AuthLike target, address rely, address deny) public {
+        target.rely(rely);
+        target.deny(deny);
+    }
+}
+
+// ------------------------------------------------------------------
+// Governance Proposal
+// ------------------------------------------------------------------
 
 contract Action {
     function execute(Target target) public {
@@ -107,30 +125,26 @@ contract Action {
     }
 }
 
-// ------------------------------------------------------------------
-// Governance Proposal
-// ------------------------------------------------------------------
-
 contract Proposal {
     bool done = false;
 
     DSProxy proxy;
     Scheduler scheduler;
     DSPause pause;
-    Action action;
     Target target;
 
-    constructor(DSProxy proxy_, Scheduler scheduler_, DSPause pause_, Action action_, Target target_) public {
+    constructor(DSProxy proxy_, Scheduler scheduler_, DSPause pause_, Target target_) public {
         proxy = proxy_;
         scheduler = scheduler_;
         pause = pause_;
-        action = action_;
         target = target_;
     }
 
     function execute() public returns (bytes memory) {
         require(!done);
         done = true;
+
+        Action action = new Action();
 
         bytes memory scheduleBytes = abi.encodeWithSignature(
             "schedule(address,address,bytes)",
@@ -169,7 +183,7 @@ contract Integration is DSTest {
     // timings
     uint256 start = 1;
     uint256 delay = 1;
-    uint256 ready = 3;
+    uint256 step = delay + 1;
 
     function setUp() public {
         // init hevm
@@ -192,10 +206,23 @@ contract Integration is DSTest {
         proxy.setAuthority(chief);
         proxy.setOwner(address(0));
 
+        // proxy script for changing pause ownership
+        Ownership ownership = new Ownership();
+
         // init pause and set gov proxy as owner
         pause = new DSPause(delay);
-        pause.rely(address(proxy));
-        pause.deny(address(this));
+        bytes32 id = pause.schedule(
+            address(ownership),
+            abi.encodeWithSignature(
+                "swap(address,address,address)",
+                address(pause),
+                address(proxy),
+                address(this)
+            )
+        );
+
+        hevm.warp(now + step);
+        pause.execute(id);
 
         // init user and give them some gov tokens
         user = new User(chief, gov, pause);
@@ -214,10 +241,9 @@ contract Integration is DSTest {
         user.lock(initialBalance);
     }
 
-    function test_execution() public {
+    function test_simple_proposal() public {
         // create proposal
-        Action action = new Action();
-        Proposal proposal = new Proposal(proxy, scheduler, pause, action, target);
+        Proposal proposal = new Proposal(proxy, scheduler, pause, target);
 
         // make proposal the hat
         address[] memory votes = new address[](1);
@@ -232,7 +258,7 @@ contract Integration is DSTest {
         bytes32 id = user.executeProposal(proposal);
 
         // execute action
-        hevm.warp(ready);
+        hevm.warp(now + step);
         assertEq(target.val(), 0);
 
         user.executeAction(id);

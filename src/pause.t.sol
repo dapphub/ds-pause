@@ -42,6 +42,24 @@ contract Stranger {
     }
 }
 
+contract AuthLike {
+    function rely(address) public;
+    function deny(address) public;
+    function wards(address) public returns (uint);
+}
+
+contract Ownership {
+    function rely(AuthLike target, address who) public {
+        target.rely(who);
+        require(target.wards(who) == 1);
+    }
+
+    function deny(AuthLike target, address who) public {
+        target.deny(who);
+        require(target.wards(who) == 0);
+    }
+}
+
 // ------------------------------------------------------------------
 // Common Setup
 // ------------------------------------------------------------------
@@ -51,10 +69,11 @@ contract Test is DSTest {
     Target target;
     Hevm hevm;
     Stranger stranger;
+    Ownership ownership;
 
     uint256 start = 1;
     uint256 delay = 1;
-    uint256 ready = 3;
+    uint256 step = delay + 1;
 
     function setUp() public {
         hevm = Hevm(0x7109709ECfa91a80626fF3989D68f67F5b1DD12D);
@@ -63,6 +82,7 @@ contract Test is DSTest {
         target = new Target();
         pause = new DSPause(delay);
         stranger = new Stranger();
+        ownership = new Ownership();
     }
 }
 
@@ -82,11 +102,6 @@ contract Constructor is DSTest {
         assertEq(pause.wards(address(this)), 1);
     }
 
-    function test_not_frozen() public {
-        DSPause pause = new DSPause(100);
-        assertEq(pause.freezeUntil(), 0);
-    }
-
 }
 
 contract Auth is Test {
@@ -96,9 +111,17 @@ contract Auth is Test {
         stranger.call(address(pause), data);
     }
 
+    function testFail_call_rely_from_owner() public {
+        pause.rely(address(this));
+    }
+
     function testFail_call_deny_from_non_owner() public {
-        bytes memory data = abi.encodeWithSignature("deny(address)", address(this));
+        bytes memory data = abi.encodeWithSignature("deny(address)", address(stranger));
         stranger.call(address(pause), data);
+    }
+
+    function testFail_call_deny_from_owner() public {
+        pause.deny(address(this));
     }
 
     function test_call_wards_from_non_owner() public {
@@ -112,14 +135,38 @@ contract Auth is Test {
         assertEq(responseUint, 1);
     }
 
-    function test_adding_removing_owners() public {
+    function test_rely() public {
         assertEq(pause.wards(address(stranger)), 0);
 
-        pause.rely(address(stranger));
+        bytes32 id = pause.schedule(
+            address(ownership),
+            abi.encodeWithSignature(
+                "rely(address,address)",
+                address(pause),
+                address(stranger)
+            )
+        );
+        hevm.warp(now + step);
+        pause.execute(id);
+
         assertEq(pause.wards(address(stranger)), 1);
+    }
 
-        pause.deny(address(stranger));
-        assertEq(pause.wards(address(stranger)), 0);
+    function test_deny() public {
+        assertEq(pause.wards(address(this)), 1);
+
+        bytes32 id = pause.schedule(
+            address(ownership),
+            abi.encodeWithSignature(
+                "deny(address,address)",
+                address(pause),
+                address(this)
+            )
+        );
+        hevm.warp(now + step);
+        pause.execute(id);
+
+        assertEq(pause.wards(address(this)), 0);
     }
 
 }
@@ -157,7 +204,7 @@ contract Execute is Test {
 
     function testFail_double_execution() public {
         bytes32 id = pause.schedule(address(target), abi.encodeWithSignature("getBytes32()"));
-        hevm.warp(ready);
+        hevm.warp(now + step);
 
         pause.execute(id);
         pause.execute(id);
@@ -165,7 +212,7 @@ contract Execute is Test {
 
     function test_execute_delay_passed() public {
         bytes32 id = pause.schedule(address(target), abi.encodeWithSignature("getBytes32()"));
-        hevm.warp(ready);
+        hevm.warp(now + step);
 
         bytes memory response = pause.execute(id);
 
@@ -178,7 +225,7 @@ contract Execute is Test {
 
     function test_call_from_non_owner() public {
         bytes32 id = pause.schedule(address(target), abi.encodeWithSignature("getBytes32()"));
-        hevm.warp(ready);
+        hevm.warp(now + step);
 
         stranger.call(address(pause), abi.encodeWithSignature("execute(bytes32)", id));
     }
@@ -189,7 +236,7 @@ contract Cancel is Test {
 
     function testFail_call_from_non_owner() public {
         bytes32 id = pause.schedule(address(target), abi.encodeWithSignature("getBytes32()"));
-        hevm.warp(ready);
+        hevm.warp(now + step);
 
         bytes memory data = abi.encodeWithSignature("cancel(bytes32)", id);
         stranger.call(address(pause), data);
@@ -197,7 +244,7 @@ contract Cancel is Test {
 
     function test_cancel_scheduled_execution() public {
         bytes32 id = pause.schedule(address(target), abi.encodeWithSignature("getBytes32()"));
-        hevm.warp(ready);
+        hevm.warp(now + step);
 
         pause.cancel(id);
 
@@ -205,48 +252,6 @@ contract Cancel is Test {
         assertEq(guy, address(0));
         assertEq0(data, new bytes(0));
         assertEq(timestamp, 0);
-    }
-
-}
-
-contract Freeze is Test {
-
-    function testFail_call_from_non_owner() public {
-        bytes memory data = abi.encodeWithSignature("freeze(uint256)", 5);
-        stranger.call(address(pause), data);
-    }
-
-    function testFail_freeze_schedule() public {
-        pause.freeze(100);
-        pause.schedule(address(target), abi.encode(0));
-    }
-
-    function testFail_freeze_execute() public {
-        bytes32 id = pause.schedule(address(target), abi.encodeWithSignature("getBytes32()"));
-        pause.freeze(100);
-        hevm.warp(ready);
-        pause.execute(id);
-    }
-
-    function testFail_freeze_cancel() public {
-        bytes32 id = pause.schedule(address(target), abi.encode(0));
-        pause.freeze(100);
-        pause.cancel(id);
-    }
-
-    function testFail_freeze_freeze() public {
-        pause.freeze(100);
-        pause.freeze(1000);
-    }
-
-    function testFail_freeze_rely() public {
-        pause.freeze(100);
-        pause.rely(address(stranger));
-    }
-
-    function testFail_freeze_deny() public {
-        pause.freeze(100);
-        pause.deny(address(stranger));
     }
 
 }

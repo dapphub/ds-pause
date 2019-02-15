@@ -124,17 +124,6 @@ contract Auth is Test {
         pause.deny(address(this));
     }
 
-    function test_call_wards_from_non_owner() public {
-        bytes memory data = abi.encodeWithSignature("wards(address)", address(this));
-        bytes memory response = stranger.call(address(pause), data);
-
-        uint256 responseUint;
-        assembly {
-            responseUint := mload(add(response, 32))
-        }
-        assertEq(responseUint, 1);
-    }
-
     function test_rely() public {
         assertEq(pause.wards(address(stranger)), 0);
 
@@ -168,6 +157,18 @@ contract Auth is Test {
 
         assertEq(pause.wards(address(this)), 0);
     }
+
+    function test_call_wards_from_non_owner() public {
+        bytes memory data = abi.encodeWithSignature("wards(address)", address(this));
+        bytes memory response = stranger.call(address(pause), data);
+
+        uint256 responseUint;
+        assembly {
+            responseUint := mload(add(response, 32))
+        }
+        assertEq(responseUint, 1);
+    }
+
 
 }
 

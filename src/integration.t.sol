@@ -36,24 +36,15 @@ interface Proposal {
 }
 
 contract User {
-    DSChief chief;
-    DSToken gov;
-    DSPause pause;
 
-    function init(DSChief chief_, DSToken gov_, DSPause pause_) public {
-        chief = chief_;
-        gov = gov_;
-        pause = pause_;
-    }
-
-    function vote(address proposal) public {
+    function vote(DSChief chief, address proposal) public {
         address[] memory votes = new address[](1);
         votes[0] = address(proposal);
         chief.vote(votes);
     }
 
-    function lift(address who) external {
-        chief.lift(who);
+    function lift(DSChief chief, address proposal) external {
+        chief.lift(proposal);
     }
 
     function executeProposal(Proposal proposal) public returns (bytes32) {
@@ -66,13 +57,20 @@ contract User {
         return id;
     }
 
-    function executeAction(bytes32 id) external {
+    function executeAction(DSPause pause, bytes32 id) external {
         pause.execute(id);
     }
 
-    function lock(uint amount) public {
+    function lock(DSChief chief, uint amount) public {
+        DSToken gov = chief.GOV();
         gov.approve(address(chief));
         chief.lock(amount);
+    }
+
+    function free(DSChief chief, uint amount) public {
+        DSToken iou = chief.IOU();
+        iou.approve(address(chief));
+        chief.free(amount);
     }
 }
 
@@ -208,15 +206,6 @@ contract Test is DSTest {
         gov.mint(address(user), initialBalance);
         gov.setOwner(address(0));
 
-        // create gov system
-        (proxy, chief, pause) = govFactory.create(gov, delay);
-
-        // create user
-        user.init(chief, gov, pause);
-
-        // target is owned by pause
-        target.rely(address(pause));
-        target.deny(address(this));
     }
 }
 
@@ -263,13 +252,18 @@ contract SimpleProposal is Proposal {
 contract Voting is Test {
 
     function test_simple_proposal() public {
+        // create gov system
+        (proxy, chief, pause) = govFactory.create(gov, delay);
+        user.lock(chief, initialBalance);
+        target.rely(address(pause));
+        target.deny(address(this));
+
         // create proposal
         SimpleProposal proposal = new SimpleProposal(proxy, scheduler, pause, target);
 
         // make proposal the hat
-        user.lock(initialBalance);
-        user.vote(address(proposal));
-        user.lift(address(proposal));
+        user.vote(chief, address(proposal));
+        user.lift(chief, address(proposal));
 
         // execute proposal (schedule action)
         bytes32 id = user.executeProposal(proposal);
@@ -279,8 +273,134 @@ contract Voting is Test {
 
         // execute action
         assertEq(target.val(), 0);
-        user.executeAction(id);
+        user.executeAction(pause, id);
         assertEq(target.val(), 1);
+    }
+
+}
+
+// ------------------------------------------------------------------
+// Test Chief Upgrades
+// ------------------------------------------------------------------
+
+contract AddGuardProposal is Proposal {
+    bool done = false;
+
+    Scheduler scheduler;
+    Guard guard;
+    DSPause pause;
+    DSProxy oldChiefProxy;
+
+    constructor(Scheduler scheduler_, DSPause pause_, DSProxy oldChiefProxy_, Guard guard_) public {
+        scheduler = scheduler_;
+        guard = guard_;
+        pause = pause_;
+        oldChiefProxy = oldChiefProxy_;
+    }
+
+    function execute() public returns (bytes memory) {
+        require(!done);
+        done = true;
+
+        Ownership ownership = new Ownership();
+        bytes memory scheduleBytes = abi.encodeWithSignature(
+            "schedule(address,address,bytes)",
+            pause,
+            address(ownership),
+            abi.encodeWithSignature(
+                "swap(address,address,address)",
+                pause, oldChiefProxy, guard
+            )
+        );
+        return oldChiefProxy.execute(address(scheduler), scheduleBytes);
+    }
+}
+
+contract Guard {
+    DSPause pause;
+    address newOwner;
+
+    Ownership ownership;
+    uint lockUntil;
+
+    constructor(uint delay, DSPause pause_, address newOwner_) public {
+        lockUntil = now + delay;
+
+        pause = pause_;
+        newOwner = newOwner_;
+        ownership = new Ownership();
+    }
+
+    function unlock() public returns (bytes32) {
+        require(now > lockUntil);
+
+        return pause.schedule(
+            address(ownership),
+            abi.encodeWithSignature(
+                "swap(address,address,address)",
+                pause, this, newOwner
+            )
+        );
+    }
+}
+
+contract UpgradeChief is Test {
+
+    function test_chief_upgrade() public {
+        // create old gov system
+        (DSProxy oldProxy, DSChief oldChief, DSPause pause) = govFactory.create(gov, delay);
+        user.lock(oldChief, initialBalance);
+
+        // target is owned by pause
+        target.rely(address(pause));
+        target.deny(address(this));
+
+        // create new gov system
+        (DSProxy newProxy, DSChief newChief, DSPause _) = govFactory.create(gov, delay);
+        _; // silence compiler warning
+
+        // add guard proposal
+        Guard guard = new Guard(delay * 2, pause, address(newProxy));
+        AddGuardProposal proposal = new AddGuardProposal(scheduler, pause, oldProxy, guard);
+
+        // vote for proposal
+        user.vote(oldChief, address(proposal));
+        user.lift(oldChief, address(proposal));
+
+        // schedule proposal
+        bytes32 id = user.executeProposal(proposal);
+
+        // wait until delay is passed
+        hevm.warp(now + step);
+
+        // set guard as owner
+        pause.execute(id);
+
+        // check that the guard is the owner
+        assertEq(pause.wards(address(oldProxy)), 0);
+        assertEq(pause.wards(address(newProxy)), 0);
+        assertEq(pause.wards(address(guard)), 1);
+
+        // move MKR from old chief to new chief
+        user.free(oldChief, initialBalance);
+        user.lock(newChief, initialBalance);
+
+        // wait until unlock period has passed
+        hevm.warp(now + step);
+
+        // schedule ownership transfer from guard to newChief
+        id = guard.unlock();
+
+        // wait until delay has passed
+        hevm.warp(now + step);
+
+        // schedule ownership transfer from guard to newChief
+        pause.execute(id);
+
+        // check that the new chief is the owner
+        assertEq(pause.wards(address(oldProxy)), 0);
+        assertEq(pause.wards(address(guard)), 0);
+        assertEq(pause.wards(address(newProxy)), 1);
     }
 
 }

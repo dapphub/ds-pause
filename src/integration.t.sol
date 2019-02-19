@@ -159,9 +159,6 @@ contract Test is DSTest {
     Target target;
     User user;
 
-    // proxy scripts
-    GovProxyActions govProxyActions;
-
     // pause timings
     uint256 start = 0;
     uint256 delay = 1;
@@ -182,9 +179,6 @@ contract Test is DSTest {
         govFactory = new GovFactory();
         target = new Target();
         user = new User();
-
-        // create proxy script
-        govProxyActions = new GovProxyActions();
 
         // create gov token
         gov = new DSToken("GOV");

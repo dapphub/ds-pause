@@ -31,8 +31,8 @@ contract Hevm {
     function warp(uint256) public;
 }
 
-interface Proposal {
-    function execute() external returns (bytes memory);
+contract ProposalLike {
+    function execute() public returns (bytes memory);
 }
 
 contract User {
@@ -47,8 +47,8 @@ contract User {
         chief.lift(proposal);
     }
 
-    function executeProposal(Proposal proposal) public returns (bytes32) {
-        bytes memory response = proposal.execute();
+    function executeProposal(address proposal) public returns (bytes32) {
+        bytes memory response = ProposalLike(proposal).execute();
 
         bytes32 id;
         assembly {
@@ -198,7 +198,7 @@ contract SimpleAction {
     }
 }
 
-contract SimpleProposal is Proposal {
+contract SimpleProposal {
     bool done = false;
     SimpleAction action = new SimpleAction();
 
@@ -245,7 +245,7 @@ contract Voting is Test {
         user.lift(chief, address(proposal));
 
         // execute proposal (schedule action)
-        bytes32 id = user.executeProposal(proposal);
+        bytes32 id = user.executeProposal(address(proposal));
 
         // wait until delay is passed
         hevm.warp(now + step);
@@ -287,7 +287,7 @@ contract Guard {
     }
 }
 
-contract AddGuardProposal is Proposal {
+contract AddGuardProposal {
     bool done = false;
 
     Guard guard;
@@ -348,7 +348,7 @@ contract UpgradeChief is Test {
         user.lift(oldChief, address(proposal));
 
         // schedule proposal
-        bytes32 id = user.executeProposal(proposal);
+        bytes32 id = user.executeProposal(address(proposal));
 
         // wait until delay is passed
         hevm.warp(now + step);

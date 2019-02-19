@@ -114,11 +114,11 @@ contract GovFactory {
         pause = new DSPause(delay);
 
         // schedule pause ownership change
-        Ownership ownership = new Ownership();
+        GovProxyActions govProxyActions = new GovProxyActions();
         bytes32 id = pause.schedule(
-            address(ownership),
+            address(govProxyActions),
             abi.encodeWithSignature(
-                "swap(address,address,address)",
+                "swapOwner(address,address,address)",
                 address(pause),
                 address(this),
                 address(proxy)
@@ -135,27 +135,17 @@ contract GovFactory {
 // Proxy Scripts
 // ------------------------------------------------------------------
 
-contract Ownership {
-    function rely(DSPause pause, address who) public {
-        pause.rely(who);
-        require(pause.wards(who) == 1);
+contract GovProxyActions {
+
+    function swapOwner(DSPause pause, address prev, address next) public {
+        pause.rely(next);
+        pause.deny(prev);
     }
 
-    function deny(DSPause pause, address who) public {
-        pause.deny(who);
-        require(pause.wards(who) == 0);
-    }
-
-    function swap(DSPause pause, address prev, address next) public {
-        rely(pause, next);
-        deny(pause, prev);
-    }
-}
-
-contract Scheduler {
     function schedule(DSPause pause, address guy, bytes memory data) public returns (bytes32) {
         return pause.schedule(guy, data);
     }
+
 }
 
 // ------------------------------------------------------------------
@@ -170,8 +160,7 @@ contract Test is DSTest {
     User user;
 
     // proxy scripts
-    Scheduler scheduler;
-    Ownership ownership;
+    GovProxyActions govProxyActions;
 
     // pause timings
     uint256 start = 0;
@@ -183,9 +172,6 @@ contract Test is DSTest {
 
     // gov system
     DSToken gov;
-    DSProxy proxy;
-    DSChief chief;
-    DSPause pause;
 
     function setUp() public {
         // init hevm
@@ -197,9 +183,8 @@ contract Test is DSTest {
         target = new Target();
         user = new User();
 
-        // create proxy scripts
-        ownership = new Ownership();
-        scheduler = new Scheduler();
+        // create proxy script
+        govProxyActions = new GovProxyActions();
 
         // create gov token
         gov = new DSToken("GOV");
@@ -224,13 +209,13 @@ contract SimpleProposal is Proposal {
     SimpleAction action = new SimpleAction();
 
     DSProxy proxy;
-    Scheduler scheduler;
+    GovProxyActions govProxyActions;
     DSPause pause;
     Target target;
 
-    constructor(DSProxy proxy_, Scheduler scheduler_, DSPause pause_, Target target_) public {
+    constructor(DSProxy proxy_, GovProxyActions govProxyActions_, DSPause pause_, Target target_) public {
         proxy = proxy_;
-        scheduler = scheduler_;
+        govProxyActions = govProxyActions_;
         pause = pause_;
         target = target_;
     }
@@ -245,7 +230,7 @@ contract SimpleProposal is Proposal {
             address(action),
             abi.encodeWithSignature("execute(address)", target)
         );
-        return proxy.execute(address(scheduler), scheduleBytes);
+        return proxy.execute(address(govProxyActions), scheduleBytes);
     }
 }
 
@@ -253,13 +238,13 @@ contract Voting is Test {
 
     function test_simple_proposal() public {
         // create gov system
-        (proxy, chief, pause) = govFactory.create(gov, delay);
+        (DSProxy proxy, DSChief chief, DSPause pause) = govFactory.create(gov, delay);
         user.lock(chief, initialBalance);
         target.rely(address(pause));
         target.deny(address(this));
 
         // create proposal
-        SimpleProposal proposal = new SimpleProposal(proxy, scheduler, pause, target);
+        SimpleProposal proposal = new SimpleProposal(proxy, govProxyActions, pause, target);
 
         // make proposal the hat
         user.vote(chief, address(proposal));
@@ -283,16 +268,39 @@ contract Voting is Test {
 // Test Chief Upgrades
 // ------------------------------------------------------------------
 
+contract Guard {
+    uint lockUntil;
+    address newOwner;
+    DSPause pause;
+
+    constructor(uint lockUntil_, DSPause pause_, address newOwner_) public {
+        lockUntil = lockUntil_;
+        newOwner = newOwner_;
+        pause = pause_;
+    }
+
+    function unlock() public returns (bytes32) {
+        require(now > lockUntil);
+
+        GovProxyActions govProxyActions = new GovProxyActions();
+        return pause.schedule(
+            address(govProxyActions),
+            abi.encodeWithSignature(
+                "swapOwner(address,address,address)",
+                pause, this, newOwner
+            )
+        );
+    }
+}
+
 contract AddGuardProposal is Proposal {
     bool done = false;
 
-    Scheduler scheduler;
     Guard guard;
     DSPause pause;
     DSProxy oldChiefProxy;
 
-    constructor(Scheduler scheduler_, DSPause pause_, DSProxy oldChiefProxy_, Guard guard_) public {
-        scheduler = scheduler_;
+    constructor(DSPause pause_, DSProxy oldChiefProxy_, Guard guard_) public {
         guard = guard_;
         pause = pause_;
         oldChiefProxy = oldChiefProxy_;
@@ -302,45 +310,17 @@ contract AddGuardProposal is Proposal {
         require(!done);
         done = true;
 
-        Ownership ownership = new Ownership();
+        GovProxyActions govProxyActions = new GovProxyActions();
         bytes memory scheduleBytes = abi.encodeWithSignature(
             "schedule(address,address,bytes)",
             pause,
-            address(ownership),
+            address(govProxyActions),
             abi.encodeWithSignature(
-                "swap(address,address,address)",
+                "swapOwner(address,address,address)",
                 pause, oldChiefProxy, guard
             )
         );
-        return oldChiefProxy.execute(address(scheduler), scheduleBytes);
-    }
-}
-
-contract Guard {
-    DSPause pause;
-    address newOwner;
-
-    Ownership ownership;
-    uint lockUntil;
-
-    constructor(uint delay, DSPause pause_, address newOwner_) public {
-        lockUntil = now + delay;
-
-        pause = pause_;
-        newOwner = newOwner_;
-        ownership = new Ownership();
-    }
-
-    function unlock() public returns (bytes32) {
-        require(now > lockUntil);
-
-        return pause.schedule(
-            address(ownership),
-            abi.encodeWithSignature(
-                "swap(address,address,address)",
-                pause, this, newOwner
-            )
-        );
+        return oldChiefProxy.execute(address(govProxyActions), scheduleBytes);
     }
 }
 
@@ -360,8 +340,14 @@ contract UpgradeChief is Test {
         _; // silence compiler warning
 
         // add guard proposal
-        Guard guard = new Guard(delay * 2, pause, address(newProxy));
-        AddGuardProposal proposal = new AddGuardProposal(scheduler, pause, oldProxy, guard);
+        uint lockGuardUntil = now + 1000;
+        Guard guard = new Guard(lockGuardUntil, pause, address(newProxy));
+        AddGuardProposal proposal = new AddGuardProposal(pause, oldProxy, guard);
+
+        // check that the oldProxy is the owner
+        assertEq(pause.wards(address(oldProxy)), 1);
+        assertEq(pause.wards(address(guard)), 0);
+        assertEq(pause.wards(address(newProxy)), 0);
 
         // vote for proposal
         user.vote(oldChief, address(proposal));
@@ -378,15 +364,15 @@ contract UpgradeChief is Test {
 
         // check that the guard is the owner
         assertEq(pause.wards(address(oldProxy)), 0);
-        assertEq(pause.wards(address(newProxy)), 0);
         assertEq(pause.wards(address(guard)), 1);
+        assertEq(pause.wards(address(newProxy)), 0);
 
         // move MKR from old chief to new chief
         user.free(oldChief, initialBalance);
         user.lock(newChief, initialBalance);
 
         // wait until unlock period has passed
-        hevm.warp(now + step);
+        hevm.warp(lockGuardUntil + 1);
 
         // schedule ownership transfer from guard to newChief
         id = guard.unlock();

@@ -208,14 +208,12 @@ contract SimpleProposal is Proposal {
     bool done = false;
     SimpleAction action = new SimpleAction();
 
-    DSProxy proxy;
-    GovProxyActions govProxyActions;
+    DSProxy govProxy;
     DSPause pause;
     Target target;
 
-    constructor(DSProxy proxy_, GovProxyActions govProxyActions_, DSPause pause_, Target target_) public {
-        proxy = proxy_;
-        govProxyActions = govProxyActions_;
+    constructor(DSProxy govProxy_, DSPause pause_, Target target_) public {
+        govProxy = govProxy_;
         pause = pause_;
         target = target_;
     }
@@ -224,13 +222,15 @@ contract SimpleProposal is Proposal {
         require(!done);
         done = true;
 
+        GovProxyActions govProxyActions = new GovProxyActions();
+
         bytes memory scheduleBytes = abi.encodeWithSignature(
             "schedule(address,address,bytes)",
             pause,
             address(action),
             abi.encodeWithSignature("execute(address)", target)
         );
-        return proxy.execute(address(govProxyActions), scheduleBytes);
+        return govProxy.execute(address(govProxyActions), scheduleBytes);
     }
 }
 
@@ -244,7 +244,7 @@ contract Voting is Test {
         target.deny(address(this));
 
         // create proposal
-        SimpleProposal proposal = new SimpleProposal(proxy, govProxyActions, pause, target);
+        SimpleProposal proposal = new SimpleProposal(proxy, pause, target);
 
         // make proposal the hat
         user.vote(chief, address(proposal));

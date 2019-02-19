@@ -347,13 +347,13 @@ contract UpgradeChief is Test {
         user.vote(oldChief, address(proposal));
         user.lift(oldChief, address(proposal));
 
-        // schedule proposal
+        // schedule ownership transfer from oldProxy to guard
         bytes32 id = user.executeProposal(address(proposal));
 
         // wait until delay is passed
         hevm.warp(now + step);
 
-        // set guard as owner
+        // execute ownership transfer from oldProxy to guard
         pause.execute(id);
 
         // check that the guard is the owner
@@ -374,7 +374,7 @@ contract UpgradeChief is Test {
         // wait until delay has passed
         hevm.warp(now + step);
 
-        // trigger ownership transfer from guard to newChief
+        // execute ownership transfer from guard to newChief
         pause.execute(id);
 
         // check that the new chief is the owner

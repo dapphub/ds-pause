@@ -4,15 +4,27 @@ _schedule function calls that can only be executed after some predetermined dela
 
 This can be useful as a security component within a governance system, to ensure that those affected by governance decisions have time to react in the case of an attack.
 
-## Auth
-
-This contract makes use of a simple multi-owner auth scheme. Owners can add (`rely`) or remove (`deny`) other owners. Methods marked with the `auth` modifier can only be called by owners.
-
 ## Interface
 
 **`constructor(uint256 delay)`**
 
 - Initializes a new instance of the contract with a delay in ms
+
+**`rely(address guy)`**
+
+- Add `guy` as an owner
+- `guy` can now call methods restricted with `auth`
+- Subject to a delay (can only be called by using `schedule` and then `execute`)
+
+**`deny(address guy)`**
+
+- Remove `guy` from the owners list
+- `guy` can no longer call methods restricted with `auth`
+- Subject to a delay (can only be called by using `schedule` and then `execute`)
+
+**`wards(address guy)`**
+
+- Returns `1` if `guy` is an owner, `0` otherwise.
 
 **`schedule(address guy, bytes memory data) auth returns (bytes32 id)`**
 
@@ -27,11 +39,6 @@ This contract makes use of a simple multi-owner auth scheme. Owners can add (`re
 
 - Executes the given function call (using `delegatecall`) as long as the delay period has passed.
 - Returns the `delegatecall` output
-
-**`freeze(uint256 timestamp) auth`**
-
-- Nothing can be scheduled, canceled or executed until `timestamp`.
-- Owners cannot be added or removed while frozen.
 
 ## Tests
 

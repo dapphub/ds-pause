@@ -233,7 +233,6 @@ contract Voting is Test {
     function test_simple_proposal() public {
         // create gov system
         (DSProxy proxy, DSChief chief, DSPause pause) = govFactory.create(gov, delay);
-        user.lock(chief, initialBalance);
         target.rely(address(pause));
         target.deny(address(this));
 
@@ -241,6 +240,7 @@ contract Voting is Test {
         SimpleProposal proposal = new SimpleProposal(proxy, pause, target);
 
         // make proposal the hat
+        user.lock(chief, initialBalance);
         user.vote(chief, address(proposal));
         user.lift(chief, address(proposal));
 
@@ -323,7 +323,6 @@ contract UpgradeChief is Test {
     function test_chief_upgrade() public {
         // create old gov system
         (DSProxy oldProxy, DSChief oldChief, DSPause pause) = govFactory.create(gov, delay);
-        user.lock(oldChief, initialBalance);
 
         // target is owned by pause
         target.rely(address(pause));
@@ -344,6 +343,7 @@ contract UpgradeChief is Test {
         assertEq(pause.wards(address(newProxy)), 0);
 
         // vote for proposal
+        user.lock(oldChief, initialBalance);
         user.vote(oldChief, address(proposal));
         user.lift(oldChief, address(proposal));
 
@@ -374,7 +374,7 @@ contract UpgradeChief is Test {
         // wait until delay has passed
         hevm.warp(now + step);
 
-        // schedule ownership transfer from guard to newChief
+        // trigger ownership transfer from guard to newChief
         pause.execute(id);
 
         // check that the new chief is the owner

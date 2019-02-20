@@ -329,8 +329,7 @@ contract UpgradeChief is Test {
         target.deny(address(this));
 
         // create new gov system
-        (DSProxy newProxy, DSChief newChief, DSPause _) = govFactory.create(gov, delay);
-        _; // silence compiler warning
+        (DSProxy newProxy, DSChief newChief, ) = govFactory.create(gov, delay);
 
         // add guard proposal
         uint lockGuardUntil = now + 1000;

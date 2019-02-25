@@ -15,6 +15,8 @@
 
 pragma solidity >=0.5.0 <0.6.0;
 
+import "ds-auth/auth.sol";
+
 contract DSPause {
     // --- Auth ---
     mapping (address => uint256) public wards;
@@ -97,4 +99,17 @@ contract DSPause {
         }
     }
 
+}
+
+// Utility contract to allow for easy integration with ds-auth based systems
+contract Scheduler is DSAuth {
+    DSPause pause;
+
+    constructor(DSPause pause_) public {
+        pause = pause_;
+    }
+
+    function schedule(address target, bytes memory data) public auth returns (bytes32) {
+        return pause.schedule(target, data);
+    }
 }

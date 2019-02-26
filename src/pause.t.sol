@@ -73,7 +73,6 @@ contract Test is DSTest {
 
     uint start = 1;
     uint delay = 1;
-    uint step = delay + 1;
 
     function setUp() public {
         hevm = Hevm(0x7109709ECfa91a80626fF3989D68f67F5b1DD12D);
@@ -135,7 +134,7 @@ contract Auth is Test {
                 address(stranger)
             )
         );
-        hevm.warp(now + step);
+        hevm.warp(now + delay);
         pause.execute(who, data, when);
 
         assertEq(pause.wards(address(stranger)), 1);
@@ -152,7 +151,7 @@ contract Auth is Test {
                 address(this)
             )
         );
-        hevm.warp(now + step);
+        hevm.warp(now + delay);
         pause.execute(who, data, when);
 
         assertEq(pause.wards(address(this)), 0);
@@ -209,7 +208,7 @@ contract Execute is Test {
 
     function testFail_double_execution() public {
         (address guy, bytes memory data, uint when) = pause.schedule(address(target), abi.encodeWithSignature("getBytes32()"));
-        hevm.warp(now + step);
+        hevm.warp(now + delay);
 
         pause.execute(guy, data, when);
         pause.execute(guy, data, when);
@@ -217,7 +216,7 @@ contract Execute is Test {
 
     function test_execute_delay_passed() public {
         (address guy, bytes memory data, uint when) = pause.schedule(address(target), abi.encodeWithSignature("getBytes32()"));
-        hevm.warp(now + step);
+        hevm.warp(now + delay);
 
         bytes memory response = pause.execute(guy, data, when);
 
@@ -230,7 +229,7 @@ contract Execute is Test {
 
     function test_call_from_non_owner() public {
         (address guy, bytes memory data, uint when) = pause.schedule(address(target), abi.encodeWithSignature("getBytes32()"));
-        hevm.warp(now + step);
+        hevm.warp(now + delay);
 
         stranger.call(address(pause), abi.encodeWithSignature("execute(address,bytes,uint256)", guy, data, when));
     }
@@ -241,7 +240,7 @@ contract Cancel is Test {
 
     function testFail_call_from_non_owner() public {
         (address guy, bytes memory data, uint when) = pause.schedule(address(target), abi.encodeWithSignature("getBytes32()"));
-        hevm.warp(now + step);
+        hevm.warp(now + delay);
 
         bytes memory cancelData = abi.encodeWithSignature("cancel(address,bytes,uint256)", guy, data, when);
         stranger.call(address(pause), cancelData);
@@ -249,7 +248,7 @@ contract Cancel is Test {
 
     function test_cancel_scheduled_execution() public {
         (address guy, bytes memory data, uint when) = pause.schedule(address(target), abi.encodeWithSignature("getBytes32()"));
-        hevm.warp(now + step);
+        hevm.warp(now + delay);
 
         pause.cancel(guy, data, when);
 

@@ -79,7 +79,7 @@ contract DSPause {
     {
         bytes32 id = tag(guy, data, when);
 
-        require(now > when + delay, "ds-pause: delay not passed");
+        require(now >= when + delay, "ds-pause: delay not passed");
         require(scheduled[id] == true, "ds-pause: unscheduled execution");
 
         scheduled[id] = false;

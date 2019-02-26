@@ -103,7 +103,6 @@ contract GovFactory {
     {
         // constants
         uint maxSlateSize = 1;
-        uint step = delay + 1;
 
         // init chief and iou tokens
         DSChiefFab fab = new DSChiefFab();
@@ -124,7 +123,7 @@ contract GovFactory {
         bytes memory callData = abi.encodeWithSignature("swap(address,address,address)", pause, this, bridge);
         (address target, bytes memory data, uint when) = pause.schedule(address(ownershipActions), callData);
 
-        hevm.warp(now + step);
+        hevm.warp(now + delay);
         pause.execute(target, data, when);
 
         return (chief, bridge, pause);
@@ -145,7 +144,6 @@ contract Test is DSTest {
     // pause timings
     uint start = 0;
     uint delay = 1 days;
-    uint step = delay + 1;
 
     // gov constants
     uint votes = 100;
@@ -221,7 +219,7 @@ contract Voting is Test {
         (address who, bytes memory data, uint when) = proposal.execute();
 
         // wait until delay is passed
-        hevm.warp(now + step);
+        hevm.warp(now + delay);
 
         // execute action
         assertEq(target.val(), 0);
@@ -322,7 +320,7 @@ contract UpgradeChief is Test {
         (address who, bytes memory data, uint when) = proposal.execute();
 
         // wait until delay is passed
-        hevm.warp(now + step);
+        hevm.warp(now + delay);
 
         // execute ownership transfer from oldBridge to guard
         pause.execute(who, data, when);
@@ -343,7 +341,7 @@ contract UpgradeChief is Test {
         (who, data, when) = guard.unlock();
 
         // wait until delay has passed
-        hevm.warp(now + step);
+        hevm.warp(now + delay);
 
         // execute ownership transfer from guard to newChief
         pause.execute(who, data, when);

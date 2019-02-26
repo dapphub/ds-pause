@@ -22,20 +22,20 @@ This can be useful as a security component within a governance system, to ensure
 - `guy` can no longer call methods restricted with `auth`
 - Subject to a delay (can only be called by using `schedule` and then `execute`)
 
-**`wards(address guy) returns (uint)`**
+**`wards(address guy)`**
 
 - Returns `1` if `guy` is an owner, `0` otherwise.
 
-**`schedule(address guy, bytes memory data) auth returns (address, bytes memory, uint256)`**
+**`schedule(address guy, bytes memory data) auth returns (bytes32 id)`**
 
 - Schedule a call with `data` calldata to address `guy`.
-- Returns all data needed to execute or cancel the scheduled call
+- Returns the id needed to execute or cancel the call.
 
-**`cancel(address guy, bytes memory data, uint256 when) auth`**
+**`cancel(bytes32 id) auth`**
 
 - Cancels a scheduled execution.
 
-**`execute(address guy, bytes memory data, uint256 when) returns (bytes memory response)`**
+**`execute(bytes32 id) returns (bytes memory response)`**
 
 - Executes the given function call (using `delegatecall`) as long as the delay period has passed.
 - Returns the `delegatecall` output

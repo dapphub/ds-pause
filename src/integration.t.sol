@@ -121,13 +121,18 @@ contract GovFactory {
         OwnershipActions ownershipActions = new OwnershipActions();
 
         // add scheduler as an owner
-        bytes memory callData = abi.encodeWithSignature("swap(address,address,address)", pause, this, scheduler);
-        (address target, bytes memory data, uint256 when) = pause.schedule(address(ownershipActions), callData);
+        bytes memory callData = abi.encodeWithSignature("rely(address,address)", pause, scheduler);
+        bytes32 id = pause.schedule(address(ownershipActions), callData);
 
         hevm.warp(now + step);
-        pause.execute(target, data, when);
+        pause.execute(id);
 
-        require(pause.wards(address(this)) == 0);
+        // remove govFactory as an owner
+        callData = abi.encodeWithSignature("deny(address,address)", pause, this);
+        id = pause.schedule(address(ownershipActions), callData);
+
+        hevm.warp(now + step);
+        pause.execute(id);
 
         return (chief, scheduler, pause);
     }
@@ -194,7 +199,7 @@ contract SimpleProposal {
         target = target_;
     }
 
-    function execute() public returns (address, bytes memory, uint256) {
+    function execute() public returns (bytes32) {
         require(!done);
         done = true;
 
@@ -220,14 +225,14 @@ contract Voting is Test {
         user.lift(chief, address(proposal));
 
         // execute proposal (schedule action)
-        (address who, bytes memory data, uint256 when) = proposal.execute();
+        bytes32 id = proposal.execute();
 
         // wait until delay is passed
         hevm.warp(now + step);
 
         // execute action
         assertEq(target.val(), 0);
-        pause.execute(who, data, when);
+        pause.execute(id);
         assertEq(target.val(), 1);
     }
 
@@ -248,7 +253,7 @@ contract Guard {
         pause = pause_;
     }
 
-    function unlock() public returns (address, bytes memory, uint256) {
+    function unlock() public returns (bytes32) {
         require(now >= lockUntil);
 
         OwnershipActions ownershipActions = new OwnershipActions();
@@ -275,7 +280,7 @@ contract AddGuardProposal {
         guard = guard_;
     }
 
-    function execute() public returns (address, bytes memory, uint256) {
+    function execute() public returns (bytes32) {
         require(!done);
         done = true;
 
@@ -321,13 +326,13 @@ contract UpgradeChief is Test {
         user.lift(oldChief, address(proposal));
 
         // schedule ownership transfer from oldScheduler to guard
-        (address who, bytes memory data, uint256 when) = proposal.execute();
+        bytes32 id = proposal.execute();
 
         // wait until delay is passed
         hevm.warp(now + step);
 
         // execute ownership transfer from oldScheduler to guard
-        pause.execute(who, data, when);
+        pause.execute(id);
 
         // check that the guard is the owner
         assertEq(pause.wards(address(oldScheduler)), 0);
@@ -342,13 +347,13 @@ contract UpgradeChief is Test {
         hevm.warp(lockGuardUntil);
 
         // schedule ownership transfer from guard to newChief
-        (who, data, when) = guard.unlock();
+        id = guard.unlock();
 
         // wait until delay has passed
         hevm.warp(now + step);
 
         // execute ownership transfer from guard to newChief
-        pause.execute(who, data, when);
+        pause.execute(id);
 
         // check that the new chief is the owner
         assertEq(pause.wards(address(oldScheduler)), 0);

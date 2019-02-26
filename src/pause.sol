@@ -22,20 +22,27 @@ contract DSPause {
     mapping (address => uint256) public wards;
 
     function rely(address guy) public {
-        require(msg.sender == address(this), "ds-pause: rely can only be called by this contract");
+        require(msg.sender == address(this), "ds-pause: auth can only be updated through schedule/execute");
         wards[guy] = 1;
     }
     function deny(address guy) public {
-        require(msg.sender == address(this), "ds-pause: deny can only be called by this contract");
+        require(msg.sender == address(this), "ds-pause: auth can only be updated through schedule/execute");
         wards[guy] = 0;
     }
+
     modifier auth {
         require(wards[msg.sender] == 1, "ds-pause: unauthorized");
         _;
     }
 
     // --- Data ---
-    mapping (bytes32 => bool) public scheduled;
+    struct Execution {
+        address  guy;
+        bytes    data;
+        uint256  timestamp;
+    }
+
+    mapping (bytes32 => Execution) public queue;
     uint256 public delay;
 
     // --- Init ---
@@ -44,49 +51,39 @@ contract DSPause {
         delay = delay_;
     }
 
-    // --- Internal ---
-    function tag(address guy, bytes memory data, uint256 when)
-        internal
-        pure
-        returns (bytes32)
-    {
-        return keccak256(abi.encode(guy, data, when));
+    // --- Authed ---
+    function schedule(address guy, bytes memory data) public auth returns (bytes32 id) {
+        require(guy != address(0), "ds-pause: cannot schedule calls to zero address");
+
+        id = keccak256(abi.encode(guy, data, now));
+
+        queue[id] = Execution({
+            guy: guy,
+            data: data,
+            timestamp: now
+        });
+
+        return id;
+    }
+
+    function cancel(bytes32 id) public auth {
+        delete queue[id];
     }
 
     // --- Public ---
-    function schedule(address guy, bytes memory data)
-        public
-        auth
-        returns (address, bytes memory, uint256)
-    {
-        bytes32 id = tag(guy, data, now);
-        scheduled[id] = true;
-        return (guy, data, now);
-    }
+    function execute(bytes32 id) public payable returns (bytes memory response) {
+        Execution memory entry = queue[id];
+        require(now > entry.timestamp + delay, "ds-pause: delay not passed");
 
-    function cancel(address guy, bytes memory data, uint256 when)
-        public
-        auth
-    {
-        bytes32 id = tag(guy, data, when);
-        scheduled[id] = false;
-    }
+        require(entry.guy != address(0), "ds-pause: no scheduled execution for given id");
+        delete queue[id];
 
-    function execute(address guy, bytes memory data, uint256 when)
-        public
-        payable
-        returns (bytes memory response)
-    {
-        bytes32 id = tag(guy, data, when);
+        address target = entry.guy;
+        bytes memory data = entry.data;
 
-        require(now > when + delay, "ds-pause: delay not passed");
-        require(scheduled[id] == true, "ds-pause: unscheduled execution");
-
-        scheduled[id] = false;
-
-        // delegatecall implementation from ds-proxy
+        // call contract in current context
         assembly {
-            let succeeded := delegatecall(sub(gas, 5000), guy, add(data, 0x20), mload(data), 0, 0)
+            let succeeded := delegatecall(sub(gas, 5000), target, add(data, 0x20), mload(data), 0, 0)
             let size := returndatasize
 
             response := mload(0x40)
@@ -96,10 +93,12 @@ contract DSPause {
 
             switch iszero(succeeded)
             case 1 {
+                // throw if delegatecall failed
                 revert(add(response, 0x20), size)
             }
         }
     }
+
 }
 
 // Utility contract to allow for easy integration with ds-auth based systems
@@ -110,11 +109,7 @@ contract Scheduler is DSAuth {
         pause = pause_;
     }
 
-    function schedule(address target, bytes memory data)
-        public
-        auth
-        returns (address, bytes memory, uint256)
-    {
+    function schedule(address target, bytes memory data) public auth returns (bytes32) {
         return pause.schedule(target, data);
     }
 }

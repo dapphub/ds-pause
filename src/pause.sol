@@ -19,12 +19,12 @@ contract DSPause {
     // --- Auth ---
     mapping (address => uint256) public wards;
 
-    function rely(address guy) public auth {
-        require(now > freezeUntil, "ds-pause: frozen");
+    function rely(address guy) public {
+        require(msg.sender == address(this), "ds-pause: auth can only be updated through schedule/execute");
         wards[guy] = 1;
     }
-    function deny(address guy) public auth {
-        require(now > freezeUntil, "ds-pause: frozen");
+    function deny(address guy) public {
+        require(msg.sender == address(this), "ds-pause: auth can only be updated through schedule/execute");
         wards[guy] = 0;
     }
 
@@ -42,18 +42,15 @@ contract DSPause {
 
     mapping (bytes32 => Execution) public queue;
     uint256 public delay;
-    uint256 public freezeUntil;
 
     // --- Init ---
     constructor(uint256 delay_) public {
         wards[msg.sender] = 1;
         delay = delay_;
-        freezeUntil = 0;
     }
 
-    // --- Logic ---
+    // --- Authed ---
     function schedule(address guy, bytes memory data) public auth returns (bytes32 id) {
-        require(now > freezeUntil, "ds-pause: frozen");
         require(guy != address(0), "ds-pause: cannot schedule calls to zero address");
 
         id = keccak256(abi.encode(guy, data, now));
@@ -67,9 +64,12 @@ contract DSPause {
         return id;
     }
 
-    function execute(bytes32 id) public payable returns (bytes memory response) {
-        require(now > freezeUntil, "ds-pause: frozen");
+    function cancel(bytes32 id) public auth {
+        delete queue[id];
+    }
 
+    // --- Public ---
+    function execute(bytes32 id) public payable returns (bytes memory response) {
         Execution memory entry = queue[id];
         require(now > entry.timestamp + delay, "ds-pause: delay not passed");
 
@@ -97,13 +97,4 @@ contract DSPause {
         }
     }
 
-    function cancel(bytes32 id) public auth {
-        require(now > freezeUntil, "ds-pause: frozen");
-        delete queue[id];
-    }
-
-    function freeze(uint256 timestamp) public auth {
-        require(now > freezeUntil, "ds-pause: frozen");
-        freezeUntil = timestamp;
-    }
 }

@@ -19,7 +19,7 @@ import "ds-auth/auth.sol";
 
 contract DSPause {
     // --- Auth ---
-    mapping (address => uint256) public wards;
+    mapping (address => uint) public wards;
 
     function rely(address guy) public {
         require(msg.sender == address(this), "ds-pause: rely can only be called by this contract");
@@ -36,16 +36,16 @@ contract DSPause {
 
     // --- Data ---
     mapping (bytes32 => bool) public scheduled;
-    uint256 public delay;
+    uint public delay;
 
     // --- Init ---
-    constructor(uint256 delay_) public {
+    constructor(uint delay_) public {
         wards[msg.sender] = 1;
         delay = delay_;
     }
 
     // --- Internal ---
-    function tag(address guy, bytes memory data, uint256 when)
+    function tag(address guy, bytes memory data, uint when)
         internal
         pure
         returns (bytes32)
@@ -57,14 +57,14 @@ contract DSPause {
     function schedule(address guy, bytes memory data)
         public
         auth
-        returns (address, bytes memory, uint256)
+        returns (address, bytes memory, uint)
     {
         bytes32 id = tag(guy, data, now);
         scheduled[id] = true;
         return (guy, data, now);
     }
 
-    function cancel(address guy, bytes memory data, uint256 when)
+    function cancel(address guy, bytes memory data, uint when)
         public
         auth
     {
@@ -72,7 +72,7 @@ contract DSPause {
         scheduled[id] = false;
     }
 
-    function execute(address guy, bytes memory data, uint256 when)
+    function execute(address guy, bytes memory data, uint when)
         public
         payable
         returns (bytes memory response)
@@ -113,12 +113,12 @@ contract DSPauseAuthBridge is DSAuth {
     function schedule(address target, bytes memory data)
         public
         auth
-        returns (address, bytes memory, uint256)
+        returns (address, bytes memory, uint)
     {
         return pause.schedule(target, data);
     }
 
-    function cancel(address target, bytes memory data, uint256 when)
+    function cancel(address target, bytes memory data, uint when)
         public
         auth
     {

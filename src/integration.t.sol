@@ -28,7 +28,7 @@ import "./pause.sol";
 // ------------------------------------------------------------------
 
 contract Hevm {
-    function warp(uint256) public;
+    function warp(uint) public;
 }
 
 contract ProposalLike {
@@ -60,7 +60,7 @@ contract User {
 }
 
 contract Target {
-    mapping (address => uint256) public wards;
+    mapping (address => uint) public wards;
     function rely(address guy) public auth { wards[guy] = 1; }
     function deny(address guy) public auth { wards[guy] = 0; }
     modifier auth { require(wards[msg.sender] == 1); _; }
@@ -69,8 +69,8 @@ contract Target {
         wards[msg.sender] = 1;
     }
 
-    uint256 public val = 0;
-    function set(uint256 val_) public auth {
+    uint public val = 0;
+    function set(uint val_) public auth {
         val = val_;
     }
 }
@@ -102,8 +102,8 @@ contract GovFactory {
     function create(DSToken gov, uint delay) public returns (DSChief, DSPauseAuthBridge, DSPause)
     {
         // constants
-        uint256 maxSlateSize = 1;
-        uint256 step = delay + 1;
+        uint maxSlateSize = 1;
+        uint step = delay + 1;
 
         // init chief and iou tokens
         DSChiefFab fab = new DSChiefFab();
@@ -122,7 +122,7 @@ contract GovFactory {
 
         // add bridge as an owner
         bytes memory callData = abi.encodeWithSignature("swap(address,address,address)", pause, this, bridge);
-        (address target, bytes memory data, uint256 when) = pause.schedule(address(ownershipActions), callData);
+        (address target, bytes memory data, uint when) = pause.schedule(address(ownershipActions), callData);
 
         hevm.warp(now + step);
         pause.execute(target, data, when);
@@ -143,9 +143,9 @@ contract Test is DSTest {
     User user;
 
     // pause timings
-    uint256 start = 0;
-    uint256 delay = 1 days;
-    uint256 step = delay + 1;
+    uint start = 0;
+    uint delay = 1 days;
+    uint step = delay + 1;
 
     // gov constants
     uint votes = 100;
@@ -192,7 +192,7 @@ contract SimpleProposal {
         target = target_;
     }
 
-    function execute() public returns (address, bytes memory, uint256) {
+    function execute() public returns (address, bytes memory, uint) {
         require(!done);
         done = true;
 
@@ -218,7 +218,7 @@ contract Voting is Test {
         user.lift(chief, address(proposal));
 
         // execute proposal (schedule action)
-        (address who, bytes memory data, uint256 when) = proposal.execute();
+        (address who, bytes memory data, uint when) = proposal.execute();
 
         // wait until delay is passed
         hevm.warp(now + step);
@@ -246,7 +246,7 @@ contract Guard {
         pause = pause_;
     }
 
-    function unlock() public returns (address, bytes memory, uint256) {
+    function unlock() public returns (address, bytes memory, uint) {
         require(now >= lockUntil);
 
         OwnershipActions ownershipActions = new OwnershipActions();
@@ -273,7 +273,7 @@ contract AddGuardProposal {
         bridge = bridge_;
     }
 
-    function execute() public returns (address, bytes memory, uint256) {
+    function execute() public returns (address, bytes memory, uint) {
         require(!done);
         done = true;
 
@@ -319,7 +319,7 @@ contract UpgradeChief is Test {
         user.lift(oldChief, address(proposal));
 
         // schedule ownership transfer from oldBridge to guard
-        (address who, bytes memory data, uint256 when) = proposal.execute();
+        (address who, bytes memory data, uint when) = proposal.execute();
 
         // wait until delay is passed
         hevm.warp(now + step);

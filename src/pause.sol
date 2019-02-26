@@ -74,7 +74,6 @@ contract DSPause {
 
     function execute(address guy, bytes memory data, uint when)
         public
-        payable
         returns (bytes memory response)
     {
         bytes32 id = tag(guy, data, when);

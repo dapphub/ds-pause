@@ -99,7 +99,7 @@ contract OwnershipActions {
 contract GovFactory {
     Hevm hevm = Hevm(0x7109709ECfa91a80626fF3989D68f67F5b1DD12D);
 
-    function create(DSToken gov, uint delay) public returns (DSChief, Scheduler, DSPause)
+    function create(DSToken gov, uint delay) public returns (DSChief, DSPauseAuthBridge, DSPause)
     {
         // constants
         uint256 maxSlateSize = 1;
@@ -112,24 +112,22 @@ contract GovFactory {
         // create pause
         DSPause pause = new DSPause(delay);
 
-        // create scheduler
-        Scheduler scheduler = new Scheduler(pause);
-        scheduler.setAuthority(chief);
-        scheduler.setOwner(address(0x0));
+        // create bridge
+        DSPauseAuthBridge bridge = new DSPauseAuthBridge(pause);
+        bridge.setAuthority(chief);
+        bridge.setOwner(address(0x0));
 
         // create proxy scripts
         OwnershipActions ownershipActions = new OwnershipActions();
 
-        // add scheduler as an owner
-        bytes memory callData = abi.encodeWithSignature("swap(address,address,address)", pause, this, scheduler);
+        // add bridge as an owner
+        bytes memory callData = abi.encodeWithSignature("swap(address,address,address)", pause, this, bridge);
         (address target, bytes memory data, uint256 when) = pause.schedule(address(ownershipActions), callData);
 
         hevm.warp(now + step);
         pause.execute(target, data, when);
 
-        require(pause.wards(address(this)) == 0);
-
-        return (chief, scheduler, pause);
+        return (chief, bridge, pause);
     }
 }
 
@@ -186,11 +184,11 @@ contract SimpleProposal {
     bool done = false;
     SimpleAction action = new SimpleAction();
 
-    Scheduler scheduler;
     Target target;
+    DSPauseAuthBridge bridge;
 
-    constructor(Scheduler scheduler_, Target target_) public {
-        scheduler = scheduler_;
+    constructor(DSPauseAuthBridge bridge_, Target target_) public {
+        bridge = bridge_;
         target = target_;
     }
 
@@ -199,7 +197,7 @@ contract SimpleProposal {
         done = true;
 
         bytes memory callData = abi.encodeWithSignature("execute(address)", target);
-        return scheduler.schedule(address(action), callData);
+        return bridge.schedule(address(action), callData);
     }
 }
 
@@ -207,12 +205,12 @@ contract Voting is Test {
 
     function test_simple_proposal() public {
         // create gov system
-        (DSChief chief, Scheduler scheduler, DSPause pause) = govFactory.create(gov, delay);
+        (DSChief chief, DSPauseAuthBridge bridge, DSPause pause) = govFactory.create(gov, delay);
         target.rely(address(pause));
         target.deny(address(this));
 
         // create proposal
-        SimpleProposal proposal = new SimpleProposal(scheduler, target);
+        SimpleProposal proposal = new SimpleProposal(bridge, target);
 
         // make proposal the hat
         user.lock(chief, votes);
@@ -265,14 +263,14 @@ contract Guard {
 contract AddGuardProposal {
     bool done = false;
 
-    DSPause pause;
-    Scheduler scheduler;
     Guard guard;
+    DSPause pause;
+    DSPauseAuthBridge bridge;
 
-    constructor(DSPause pause_, Scheduler scheduler_, Guard guard_) public {
-        pause = pause_;
-        scheduler = scheduler_;
+    constructor(DSPause pause_, DSPauseAuthBridge bridge_, Guard guard_) public {
         guard = guard_;
+        pause = pause_;
+        bridge = bridge_;
     }
 
     function execute() public returns (address, bytes memory, uint256) {
@@ -280,11 +278,11 @@ contract AddGuardProposal {
         done = true;
 
         OwnershipActions ownershipActions = new OwnershipActions();
-        return scheduler.schedule(
+        return bridge.schedule(
             address(ownershipActions),
             abi.encodeWithSignature(
                 "swap(address,address,address)",
-                pause, scheduler, guard
+                pause, bridge, guard
             )
         );
     }
@@ -294,45 +292,45 @@ contract UpgradeChief is Test {
 
     function test_chief_upgrade() public {
         // create old gov system
-        (DSChief oldChief, Scheduler oldScheduler, DSPause pause) = govFactory.create(gov, delay);
+        (DSChief oldChief, DSPauseAuthBridge oldBridge, DSPause pause) = govFactory.create(gov, delay);
 
         // target is owned by pause
         target.rely(address(pause));
         target.deny(address(this));
 
         // create new gov system
-        (DSChief newChief, Scheduler newScheduler, ) = govFactory.create(gov, delay);
+        (DSChief newChief, DSPauseAuthBridge newBridge, ) = govFactory.create(gov, delay);
 
         // create guard
         uint lockGuardUntil = now + 1000;
-        Guard guard = new Guard(lockGuardUntil, pause, address(newScheduler));
+        Guard guard = new Guard(lockGuardUntil, pause, address(newBridge));
 
         // create gov proposal to transfer ownership from oldScheduler to guard
-        AddGuardProposal proposal = new AddGuardProposal(pause, oldScheduler, guard);
+        AddGuardProposal proposal = new AddGuardProposal(pause, oldBridge, guard);
 
         // check that the oldScheduler is the owner
-        assertEq(pause.wards(address(oldScheduler)), 1);
+        assertEq(pause.wards(address(oldBridge)), 1);
         assertEq(pause.wards(address(guard)), 0);
-        assertEq(pause.wards(address(newScheduler)), 0);
+        assertEq(pause.wards(address(newBridge)), 0);
 
         // vote for proposal
         user.lock(oldChief, votes);
         user.vote(oldChief, address(proposal));
         user.lift(oldChief, address(proposal));
 
-        // schedule ownership transfer from oldScheduler to guard
+        // schedule ownership transfer from oldBridge to guard
         (address who, bytes memory data, uint256 when) = proposal.execute();
 
         // wait until delay is passed
         hevm.warp(now + step);
 
-        // execute ownership transfer from oldScheduler to guard
+        // execute ownership transfer from oldBridge to guard
         pause.execute(who, data, when);
 
         // check that the guard is the owner
-        assertEq(pause.wards(address(oldScheduler)), 0);
+        assertEq(pause.wards(address(oldBridge)), 0);
         assertEq(pause.wards(address(guard)), 1);
-        assertEq(pause.wards(address(newScheduler)), 0);
+        assertEq(pause.wards(address(newBridge)), 0);
 
         // move MKR from old chief to new chief
         user.free(oldChief, votes);
@@ -351,9 +349,9 @@ contract UpgradeChief is Test {
         pause.execute(who, data, when);
 
         // check that the new chief is the owner
-        assertEq(pause.wards(address(oldScheduler)), 0);
+        assertEq(pause.wards(address(oldBridge)), 0);
         assertEq(pause.wards(address(guard)), 0);
-        assertEq(pause.wards(address(newScheduler)), 1);
+        assertEq(pause.wards(address(newBridge)), 1);
     }
 
 }

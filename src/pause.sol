@@ -103,7 +103,7 @@ contract DSPause {
 }
 
 // Utility contract to allow for easy integration with ds-auth based systems
-contract Scheduler is DSAuth {
+contract DSPauseAuthBridge is DSAuth {
     DSPause pause;
 
     constructor(DSPause pause_) public {
@@ -116,5 +116,12 @@ contract Scheduler is DSAuth {
         returns (address, bytes memory, uint256)
     {
         return pause.schedule(target, data);
+    }
+
+    function cancel(address target, bytes memory data, uint256 when)
+        public
+        auth
+    {
+        return pause.cancel(target, data, when);
     }
 }

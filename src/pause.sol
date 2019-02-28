@@ -17,21 +17,17 @@ pragma solidity >=0.5.0 <0.6.0;
 
 import "ds-auth/auth.sol";
 
-contract DSPause {
+contract DSPause is DSAuth {
     // --- Auth ---
-    mapping (address => uint) public wards;
-
-    function rely(address guy) public {
-        require(msg.sender == address(this), "ds-pause: rely can only be called by this contract");
-        wards[guy] = 1;
+    function setOwner(address owner_) public {
+        require(msg.sender == address(this));
+        owner = owner_;
+        emit LogSetOwner(owner);
     }
-    function deny(address guy) public {
-        require(msg.sender == address(this), "ds-pause: deny can only be called by this contract");
-        wards[guy] = 0;
-    }
-    modifier auth {
-        require(wards[msg.sender] == 1, "ds-pause: unauthorized");
-        _;
+    function setAuthority(DSAuthority guy) public {
+        require(msg.sender == address(this));
+        authority = guy;
+        emit LogSetAuthority(address(authority));
     }
 
     // --- Data ---
@@ -39,9 +35,10 @@ contract DSPause {
     uint public delay;
 
     // --- Init ---
-    constructor(uint delay_) public {
-        wards[msg.sender] = 1;
+    constructor(uint delay_, address owner_, DSAuthority authority_) public {
         delay = delay_;
+        owner = owner_;
+        authority = authority_;
     }
 
     // --- Internal ---
@@ -98,29 +95,5 @@ contract DSPause {
                 revert(add(response, 0x20), size)
             }
         }
-    }
-}
-
-// Utility contract to allow for easy integration with ds-auth based systems
-contract DSPauseAuthBridge is DSAuth {
-    DSPause pause;
-
-    constructor(DSPause pause_) public {
-        pause = pause_;
-    }
-
-    function schedule(address target, bytes memory data)
-        public
-        auth
-        returns (address, bytes memory, uint)
-    {
-        return pause.schedule(target, data);
-    }
-
-    function cancel(address target, bytes memory data, uint when)
-        public
-        auth
-    {
-        return pause.cancel(target, data, when);
     }
 }

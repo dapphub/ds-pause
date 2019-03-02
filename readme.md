@@ -4,6 +4,14 @@ _schedule function calls that can only be executed after some predetermined dela
 
 This can be useful as a security component within a governance system, to ensure that those affected by governance decisions have time to react in the case of an attack.
 
+## Workflow
+
+The workflow consists of three steps:
+
+* Creation of an action contract that performs the intended change
+* Creation of a proposal contract that schedules the change
+* When the `delay` has elapsed, anybody can call `execute` on the `ds-pause` to trigger execution of the action
+
 ## Interface
 
 **`constructor(uint256 delay)`**

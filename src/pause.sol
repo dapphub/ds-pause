@@ -15,85 +15,70 @@
 
 pragma solidity >=0.5.0 <0.6.0;
 
-import "ds-auth/auth.sol";
-
-contract DSPause is DSAuth {
+contract DSPause {
     // --- Auth ---
-    function setOwner(address owner_) public {
-        require(msg.sender == address(this));
-        owner = owner_;
-        emit LogSetOwner(owner);
+    address public owner;
+    function give(address guy) {
+        require(msg.sender == address(this), "ds-pause: changes to ownership are subject to delay");
+        owner = guy;
     }
-    function setAuthority(DSAuthority guy) public {
-        require(msg.sender == address(this));
-        authority = guy;
-        emit LogSetAuthority(address(authority));
+    modifier auth() {
+        require(msg.sender == owner, "ds-pause: unauthorized");
+        _;
     }
 
     // --- Data ---
-    mapping (bytes32 => bool) public scheduled;
-    uint public delay;
+    mapping (bytes32 => bool) public wires;
+    uint public pause;
 
     // --- Init ---
-    constructor(uint delay_, address owner_, DSAuthority authority_) public {
-        delay = delay_;
+    constructor(uint pause_, address owner_) public {
+        pause = pause_;
         owner = owner_;
-        authority = authority_;
     }
 
     // --- Internal ---
-    function tag(address guy, bytes memory data, uint when)
+    function hash(address guy, bytes memory fax, uint era)
         internal
         pure
         returns (bytes32)
     {
-        return keccak256(abi.encode(guy, data, when));
+        return keccak256(abi.encode(guy, fax, era));
     }
 
     // --- Public ---
-    function schedule(address guy, bytes memory data)
-        public
-        auth
-        returns (address, bytes memory, uint)
-    {
-        bytes32 id = tag(guy, data, now);
-        scheduled[id] = true;
-        return (guy, data, now);
-    }
-
-    function cancel(address guy, bytes memory data, uint when)
+    function wire(address guy, bytes memory fax, uint era)
         public
         auth
     {
-        bytes32 id = tag(guy, data, when);
-        scheduled[id] = false;
+        bytes32 id = hash(guy, fax, era);
+        wired[id]  = true;
     }
 
-    function execute(address guy, bytes memory data, uint when)
+    function clip(address guy, bytes memory fax, uint era)
         public
-        returns (bytes memory response)
+        auth
     {
-        bytes32 id = tag(guy, data, when);
+        bytes32 id = hash(guy, fax, era);
+        wired[id]  = false;
+    }
 
-        require(now >= when + delay, "ds-pause: delay not passed");
-        require(scheduled[id] == true, "ds-pause: unscheduled execution");
+    function fire(address guy, bytes memory fax, uint era)
+        public
+        returns (bytes memory resp)
+    {
+        bytes32 id = hash(guy, fax, era);
 
-        scheduled[id] = false;
+        // checks
+        require(now >= era + pause, "ds-pause: delay not elapsed");
+        require(wired[id] == true,  "ds-pause: unscheduled execution");
 
-        // delegatecall implementation from ds-proxy
-        assembly {
-            let succeeded := delegatecall(sub(gas, 5000), guy, add(data, 0x20), mload(data), 0, 0)
-            let size := returndatasize
+        // effects
+        wired[id] = false;
 
-            response := mload(0x40)
-            mstore(0x40, add(response, and(add(add(size, 0x20), 0x1f), not(0x1f))))
-            mstore(response, size)
-            returndatacopy(add(response, 0x20), 0, size)
-
-            switch iszero(succeeded)
-            case 1 {
-                revert(add(response, 0x20), size)
-            }
-        }
+        // interactions
+        (bool succ, bytes memory resp) = address(guy).delegatecall(fax);
+        require(succ, "ds-pause: delegatecall failed");
+        return resp;
     }
 }

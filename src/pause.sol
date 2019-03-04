@@ -45,6 +45,15 @@ contract DSPause {
     }
 
     // --- Internal ---
+    function add(uint x, uint y)
+        internal
+        pure
+        returns (uint z)
+    {
+        z = x + y;
+        require(z >= x);
+    }
+
     function tag(address guy, bytes memory data, uint when)
         internal
         pure
@@ -78,8 +87,8 @@ contract DSPause {
     {
         bytes32 id = tag(guy, data, when);
 
-        require(now >= when + delay, "ds-pause: delay not passed");
-        require(scheduled[id] == true, "ds-pause: unscheduled execution");
+        require(now >= add(when, delay), "ds-pause: delay not passed");
+        require(scheduled[id] == true,   "ds-pause: unscheduled execution");
 
         scheduled[id] = false;
 

@@ -20,14 +20,12 @@ import "ds-auth/auth.sol";
 contract DSPause is DSAuth {
     // --- Auth ---
     function setOwner(address owner_) public {
-        require(msg.sender == address(this));
-        owner = owner_;
-        emit LogSetOwner(owner);
+        require(msg.sender == address(this), "ds-pause: changes to ownership must be delayed");
+        super.setOwner(owner_);
     }
-    function setAuthority(DSAuthority guy) public {
-        require(msg.sender == address(this));
-        authority = guy;
-        emit LogSetAuthority(address(authority));
+    function setAuthority(DSAuthority authority_) public {
+        require(msg.sender == address(this), "ds-pause: changes to authority must be delayed");
+        super.setAuthority(authority_);
     }
 
     // --- Data ---

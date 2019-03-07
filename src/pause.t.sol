@@ -42,21 +42,20 @@ contract Stranger {
     }
 }
 
-contract AuthLike {
-    function rely(address) public;
-    function deny(address) public;
-    function wards(address) public returns (uint);
-}
+contract Authority is DSAuthority {
+    address owner;
 
-contract Ownership {
-    function rely(AuthLike target, address who) public {
-        target.rely(who);
-        require(target.wards(who) == 1);
+    constructor() public {
+        owner = msg.sender;
     }
 
-    function deny(AuthLike target, address who) public {
-        target.deny(who);
-        require(target.wards(who) == 0);
+    function canCall(address src, address, bytes4)
+        public
+        view
+        returns (bool)
+    {
+        require(src == owner);
+        return true;
     }
 }
 
@@ -69,7 +68,6 @@ contract Test is DSTest {
     Target target;
     Hevm hevm;
     Stranger stranger;
-    Ownership ownership;
 
     uint start = 1;
     uint delay = 1;
@@ -79,9 +77,8 @@ contract Test is DSTest {
         hevm.warp(start);
 
         target = new Target();
-        pause = new DSPause(delay);
+        pause = new DSPause(delay, address(0x0), new Authority());
         stranger = new Stranger();
-        ownership = new Ownership();
     }
 }
 
@@ -92,83 +89,69 @@ contract Test is DSTest {
 contract Constructor is DSTest {
 
     function test_delay_set() public {
-        DSPause pause = new DSPause(100);
+        DSPause pause = new DSPause(100, address(0x0), new Authority());
         assertEq(pause.delay(), 100);
     }
 
-    function test_creator_is_owner() public {
-        DSPause pause = new DSPause(100);
-        assertEq(pause.wards(address(this)), 1);
+    function test_owner_set() public {
+        DSPause pause = new DSPause(100, address(0xdeadbeef), new Authority());
+        assertEq(address(pause.owner()), address(0xdeadbeef));
+    }
+
+    function test_authority_set() public {
+        Authority authority = new Authority();
+        DSPause pause = new DSPause(100, address(0x0), authority);
+        assertEq(address(pause.authority()), address(authority));
     }
 
 }
 
+contract SetAuthority {
+    function set(DSAuth guy, DSAuthority authority) public {
+        guy.setAuthority(authority);
+    }
+}
+
+contract SetOwner {
+    function set(DSAuth guy, address owner) public {
+        guy.setOwner(owner);
+    }
+}
+
 contract Auth is Test {
 
-    function testFail_call_rely_from_non_owner() public {
-        bytes memory data = abi.encodeWithSignature("rely(address)", address(stranger));
-        stranger.call(address(pause), data);
+    function testFail_cannot_set_owner_without_delay() public {
+        pause.setOwner(address(this));
     }
 
-    function testFail_call_rely_from_owner() public {
-        pause.rely(address(this));
-    }
+    function test_set_owner_with_delay() public {
+        SetOwner setOwner = new SetOwner();
 
-    function testFail_call_deny_from_non_owner() public {
-        bytes memory data = abi.encodeWithSignature("deny(address)", address(stranger));
-        stranger.call(address(pause), data);
-    }
+        bytes memory payload = abi.encodeWithSignature("set(address,address)", pause, 0xdeadbeef);
+        (address who, bytes memory data, uint when) = pause.schedule(address(setOwner), payload);
 
-    function testFail_call_deny_from_owner() public {
-        pause.deny(address(this));
-    }
-
-    function test_rely() public {
-        assertEq(pause.wards(address(stranger)), 0);
-
-        (address who, bytes memory data, uint when) = pause.schedule(
-            address(ownership),
-            abi.encodeWithSignature(
-                "rely(address,address)",
-                address(pause),
-                address(stranger)
-            )
-        );
         hevm.warp(now + delay);
         pause.execute(who, data, when);
 
-        assertEq(pause.wards(address(stranger)), 1);
+        assertEq(address(pause.owner()), address(0xdeadbeef));
     }
 
-    function test_deny() public {
-        assertEq(pause.wards(address(this)), 1);
+    function testFail_cannot_set_authority_without_delay() public {
+        pause.setAuthority(new Authority());
+    }
 
-        (address who, bytes memory data, uint when) = pause.schedule(
-            address(ownership),
-            abi.encodeWithSignature(
-                "deny(address,address)",
-                address(pause),
-                address(this)
-            )
-        );
+    function test_set_authority_with_delay() public {
+        SetAuthority setAuthority = new SetAuthority();
+        Authority newAuthority = new Authority();
+
+        bytes memory payload = abi.encodeWithSignature("set(address,address)", pause, newAuthority);
+        (address who, bytes memory data, uint when) = pause.schedule(address(setAuthority), payload);
+
         hevm.warp(now + delay);
         pause.execute(who, data, when);
 
-        assertEq(pause.wards(address(this)), 0);
+        assertEq(address(pause.authority()), address(newAuthority));
     }
-
-    function test_call_wards_from_non_owner() public {
-        bytes memory data = abi.encodeWithSignature("wards(address)", address(this));
-        bytes memory response = stranger.call(address(pause), data);
-
-        uint responseUint;
-        assembly {
-            responseUint := mload(add(response, 32))
-        }
-        assertEq(responseUint, 1);
-    }
-
-
 }
 
 contract Schedule is Test {

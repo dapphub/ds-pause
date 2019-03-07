@@ -75,61 +75,6 @@ contract Target {
     }
 }
 
-// Proxy script for changing ownership
-contract AuthLike {
-    function rely(address) public;
-    function deny(address) public;
-}
-
-contract OwnershipActions {
-    function rely(address auth, address guy) public {
-        AuthLike(auth).rely(guy);
-    }
-
-    function deny(address auth, address guy) public {
-        AuthLike(auth).deny(guy);
-    }
-
-    function swap(address auth, address prev, address next) public {
-        rely(auth, next);
-        deny(auth, prev);
-    }
-}
-
-contract GovFactory {
-    Hevm hevm = Hevm(0x7109709ECfa91a80626fF3989D68f67F5b1DD12D);
-
-    function create(DSToken gov, uint delay) public returns (DSChief, DSPauseAuthBridge, DSPause)
-    {
-        // constants
-        uint maxSlateSize = 1;
-
-        // init chief and iou tokens
-        DSChiefFab fab = new DSChiefFab();
-        DSChief chief = fab.newChief(gov, maxSlateSize);
-
-        // create pause
-        DSPause pause = new DSPause(delay);
-
-        // create bridge
-        DSPauseAuthBridge bridge = new DSPauseAuthBridge(pause);
-        bridge.setAuthority(chief);
-        bridge.setOwner(address(0x0));
-
-        // create proxy scripts
-        OwnershipActions ownershipActions = new OwnershipActions();
-
-        // add bridge as an owner
-        bytes memory callData = abi.encodeWithSignature("swap(address,address,address)", pause, this, bridge);
-        (address target, bytes memory data, uint when) = pause.schedule(address(ownershipActions), callData);
-
-        hevm.warp(now + delay);
-        pause.execute(target, data, when);
-
-        return (chief, bridge, pause);
-    }
-}
-
 // ------------------------------------------------------------------
 // Shared Test Setup
 // ------------------------------------------------------------------
@@ -137,7 +82,7 @@ contract GovFactory {
 contract Test is DSTest {
     // test harness
     Hevm hevm;
-    GovFactory govFactory;
+    DSChiefFab chiefFab;
     Target target;
     User user;
 
@@ -147,6 +92,7 @@ contract Test is DSTest {
 
     // gov constants
     uint votes = 100;
+    uint maxSlateSize = 1;
 
     // gov system
     DSToken gov;
@@ -157,7 +103,6 @@ contract Test is DSTest {
         hevm.warp(start);
 
         // create test harness
-        govFactory = new GovFactory();
         target = new Target();
         user = new User();
 
@@ -165,6 +110,9 @@ contract Test is DSTest {
         gov = new DSToken("GOV");
         gov.mint(address(user), votes);
         gov.setOwner(address(0));
+
+        // chief fab
+        chiefFab = new DSChiefFab();
     }
 }
 
@@ -182,11 +130,11 @@ contract SimpleProposal {
     bool done = false;
     SimpleAction action = new SimpleAction();
 
-    Target target;
-    DSPauseAuthBridge bridge;
+    DSPause pause;
+    Target  target;
 
-    constructor(DSPauseAuthBridge bridge_, Target target_) public {
-        bridge = bridge_;
+    constructor(DSPause pause_, Target target_) public {
+        pause = pause_;
         target = target_;
     }
 
@@ -195,7 +143,7 @@ contract SimpleProposal {
         done = true;
 
         bytes memory callData = abi.encodeWithSignature("execute(address)", target);
-        return bridge.schedule(address(action), callData);
+        return pause.schedule(address(action), callData);
     }
 }
 
@@ -203,12 +151,13 @@ contract Voting is Test {
 
     function test_simple_proposal() public {
         // create gov system
-        (DSChief chief, DSPauseAuthBridge bridge, DSPause pause) = govFactory.create(gov, delay);
+        DSChief chief = chiefFab.newChief(gov, maxSlateSize);
+        DSPause pause = new DSPause(delay, address(0x0), chief);
         target.rely(address(pause));
         target.deny(address(this));
 
         // create proposal
-        SimpleProposal proposal = new SimpleProposal(bridge, target);
+        SimpleProposal proposal = new SimpleProposal(pause, target);
 
         // make proposal the hat
         user.lock(chief, votes);
@@ -233,26 +182,39 @@ contract Voting is Test {
 // Test Chief Upgrades
 // ------------------------------------------------------------------
 
-contract Guard {
+contract SetAuthority {
+    function set(DSAuth guy, DSAuthority authority) public {
+        guy.setAuthority(authority);
+    }
+}
+
+contract Guard is DSAuthority {
     uint lockUntil;
-    address newOwner;
+    address newAuthority;
     DSPause pause;
 
-    constructor(uint lockUntil_, DSPause pause_, address newOwner_) public {
+    constructor(uint lockUntil_, DSPause pause_, address newAuthority_) public {
         lockUntil = lockUntil_;
-        newOwner = newOwner_;
+        newAuthority = newAuthority_;
         pause = pause_;
+    }
+
+    function canCall(address src, address dst, bytes4 sig) public view returns (bool) {
+        require(src == address(this));
+        require(dst == address(pause));
+        require(sig == bytes4(keccak256("schedule(address,bytes)")));
+        return true;
     }
 
     function unlock() public returns (address, bytes memory, uint) {
         require(now >= lockUntil);
 
-        OwnershipActions ownershipActions = new OwnershipActions();
+        SetAuthority setAuthority = new SetAuthority();
         return pause.schedule(
-            address(ownershipActions),
+            address(setAuthority),
             abi.encodeWithSignature(
-                "swap(address,address,address)",
-                pause, this, newOwner
+                "set(address,address)",
+                pause, newAuthority
             )
         );
     }
@@ -263,24 +225,22 @@ contract AddGuardProposal {
 
     Guard guard;
     DSPause pause;
-    DSPauseAuthBridge bridge;
 
-    constructor(DSPause pause_, DSPauseAuthBridge bridge_, Guard guard_) public {
+    constructor(DSPause pause_, Guard guard_) public {
         guard = guard_;
         pause = pause_;
-        bridge = bridge_;
     }
 
     function execute() public returns (address, bytes memory, uint) {
         require(!done);
         done = true;
 
-        OwnershipActions ownershipActions = new OwnershipActions();
-        return bridge.schedule(
-            address(ownershipActions),
+        SetAuthority setAuthority = new SetAuthority();
+        return pause.schedule(
+            address(setAuthority),
             abi.encodeWithSignature(
-                "swap(address,address,address)",
-                pause, bridge, guard
+                "set(address,address)",
+                pause, guard
             )
         );
     }
@@ -289,27 +249,24 @@ contract AddGuardProposal {
 contract UpgradeChief is Test {
 
     function test_chief_upgrade() public {
-        // create old gov system
-        (DSChief oldChief, DSPauseAuthBridge oldBridge, DSPause pause) = govFactory.create(gov, delay);
-
-        // target is owned by pause
+        // create gov system
+        DSChief oldChief = chiefFab.newChief(gov, maxSlateSize);
+        DSPause pause = new DSPause(delay, address(0x0), oldChief);
         target.rely(address(pause));
         target.deny(address(this));
 
-        // create new gov system
-        (DSChief newChief, DSPauseAuthBridge newBridge, ) = govFactory.create(gov, delay);
+        // create new chief
+        DSChief newChief = chiefFab.newChief(gov, maxSlateSize);
 
         // create guard
         uint lockGuardUntil = now + 1000;
-        Guard guard = new Guard(lockGuardUntil, pause, address(newBridge));
+        Guard guard = new Guard(lockGuardUntil, pause, address(newChief));
 
         // create gov proposal to transfer ownership from oldScheduler to guard
-        AddGuardProposal proposal = new AddGuardProposal(pause, oldBridge, guard);
+        AddGuardProposal proposal = new AddGuardProposal(pause, guard);
 
-        // check that the oldScheduler is the owner
-        assertEq(pause.wards(address(oldBridge)), 1);
-        assertEq(pause.wards(address(guard)), 0);
-        assertEq(pause.wards(address(newBridge)), 0);
+        // check that the oldChief is the authority
+        assertEq(address(pause.authority()), address(oldChief));
 
         // vote for proposal
         user.lock(oldChief, votes);
@@ -325,10 +282,8 @@ contract UpgradeChief is Test {
         // execute ownership transfer from oldBridge to guard
         pause.execute(who, data, when);
 
-        // check that the guard is the owner
-        assertEq(pause.wards(address(oldBridge)), 0);
-        assertEq(pause.wards(address(guard)), 1);
-        assertEq(pause.wards(address(newBridge)), 0);
+        // check that the guard is the authority
+        assertEq(address(pause.authority()), address(guard));
 
         // move MKR from old chief to new chief
         user.free(oldChief, votes);
@@ -346,10 +301,8 @@ contract UpgradeChief is Test {
         // execute ownership transfer from guard to newChief
         pause.execute(who, data, when);
 
-        // check that the new chief is the owner
-        assertEq(pause.wards(address(oldBridge)), 0);
-        assertEq(pause.wards(address(guard)), 0);
-        assertEq(pause.wards(address(newBridge)), 1);
+        // check that the new chief is the authority
+        assertEq(address(pause.authority()), address(newChief));
     }
 
 }

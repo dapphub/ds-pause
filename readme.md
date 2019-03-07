@@ -4,27 +4,17 @@ _schedule function calls that can only be executed after some predetermined dela
 
 This can be useful as a security component within a governance system, to ensure that those affected by governance decisions have time to react in the case of an attack.
 
+## Auth
+
+`ds-pause` uses a slightly modified form of the `ds-auth` scheme. Both `setOwner` and `setAuthority`
+can only be called by the pause itself. This means that they can only be called by using `schedule` /
+`execute` on the pause, and changes to auth are therefore also subject to a delay.
+
 ## Interface
 
 **`constructor(uint256 delay)`**
 
 - Initializes a new instance of the contract with a delay in ms
-
-**`rely(address guy)`**
-
-- Add `guy` as an owner
-- `guy` can now call methods restricted with `auth`
-- Subject to a delay (can only be called by using `schedule` and then `execute`)
-
-**`deny(address guy)`**
-
-- Remove `guy` from the owners list
-- `guy` can no longer call methods restricted with `auth`
-- Subject to a delay (can only be called by using `schedule` and then `execute`)
-
-**`wards(address guy) returns (uint)`**
-
-- Returns `1` if `guy` is an owner, `0` otherwise.
 
 **`schedule(address guy, bytes memory data) auth returns (address, bytes memory, uint256)`**
 
@@ -43,4 +33,4 @@ This can be useful as a security component within a governance system, to ensure
 ## Tests
 
 - [`pause.t.sol`](./pause.t.sol): unit tests
-- [`integration.t.sol`](./integration.t.sol): basic usage example / integation tests
+- [`integration.t.sol`](./integration.t.sol): usage examples / integation tests

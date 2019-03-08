@@ -32,7 +32,7 @@ contract Hevm {
 }
 
 contract ProposalLike {
-    function schedule() public returns (bytes memory);
+    function plan() public returns (bytes memory);
 }
 
 contract User {
@@ -92,11 +92,11 @@ contract Proposal {
         payload = payload_;
     }
 
-    function schedule() public returns (address, bytes memory, uint) {
+    function plan() public returns (address, bytes memory, uint) {
         require(!done);
         done = true;
 
-        return pause.schedule(action, payload);
+        return pause.plan(action, payload);
     }
 }
 
@@ -146,7 +146,7 @@ contract Test is DSTest {
 // ------------------------------------------------------------------
 
 contract SimpleAction {
-    function execute(Target target) public {
+    function exec(Target target) public {
         target.set(1);
     }
 }
@@ -162,22 +162,22 @@ contract Voting is Test {
 
         // create proposal
         SimpleAction action = new SimpleAction();
-        Proposal proposal = new Proposal(pause, address(action), abi.encodeWithSignature("execute(address)", target));
+        Proposal proposal = new Proposal(pause, address(action), abi.encodeWithSignature("exec(address)", target));
 
         // make proposal the hat
         user.lock(chief, votes);
         user.vote(chief, address(proposal));
         user.lift(chief, address(proposal));
 
-        // execute proposal (schedule action)
-        (address who, bytes memory data, uint when) = proposal.schedule();
+        // exec proposal (plan action)
+        (address who, bytes memory data, uint when) = proposal.plan();
 
         // wait until delay is passed
         hevm.warp(now + delay);
 
-        // execute action
+        // exec action
         assertEq(target.val(), 0);
-        pause.execute(who, data, when);
+        pause.exec(who, data, when);
         assertEq(target.val(), 1);
     }
 
@@ -207,7 +207,7 @@ contract Guard is DSAuthority {
     function canCall(address src, address dst, bytes4 sig) public view returns (bool) {
         require(src == address(this));
         require(dst == address(pause));
-        require(sig == bytes4(keccak256("schedule(address,bytes)")));
+        require(sig == bytes4(keccak256("plan(address,bytes)")));
         return true;
     }
 
@@ -215,7 +215,7 @@ contract Guard is DSAuthority {
         require(now >= lockUntil);
 
         SetAuthority setAuthority = new SetAuthority();
-        return pause.schedule(
+        return pause.plan(
             address(setAuthority),
             abi.encodeWithSignature(
                 "set(address,address)",
@@ -255,14 +255,14 @@ contract UpgradeChief is Test {
         user.vote(oldChief, address(proposal));
         user.lift(oldChief, address(proposal));
 
-        // schedule ownership transfer from oldBridge to guard
-        (address who, bytes memory data, uint when) = proposal.schedule();
+        // plan ownership transfer from oldBridge to guard
+        (address who, bytes memory data, uint when) = proposal.plan();
 
         // wait until delay is passed
         hevm.warp(now + delay);
 
-        // execute ownership transfer from oldBridge to guard
-        pause.execute(who, data, when);
+        // exec ownership transfer from oldBridge to guard
+        pause.exec(who, data, when);
 
         // check that the guard is the authority
         assertEq(address(pause.authority()), address(guard));
@@ -274,14 +274,14 @@ contract UpgradeChief is Test {
         // wait until unlock period has passed
         hevm.warp(lockGuardUntil);
 
-        // schedule ownership transfer from guard to newChief
+        // plan ownership transfer from guard to newChief
         (who, data, when) = guard.unlock();
 
         // wait until delay has passed
         hevm.warp(now + delay);
 
-        // execute ownership transfer from guard to newChief
-        pause.execute(who, data, when);
+        // exec ownership transfer from guard to newChief
+        pause.exec(who, data, when);
 
         // check that the new chief is the authority
         assertEq(address(pause.authority()), address(newChief));

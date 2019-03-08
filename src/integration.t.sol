@@ -32,7 +32,7 @@ contract Hevm {
 }
 
 contract ProposalLike {
-    function execute() public returns (bytes memory);
+    function schedule() public returns (bytes memory);
 }
 
 contract User {
@@ -72,6 +72,31 @@ contract Target {
     uint public val = 0;
     function set(uint val_) public auth {
         val = val_;
+    }
+}
+
+// ------------------------------------------------------------------
+// Gov Proposal Template
+// ------------------------------------------------------------------
+
+contract Proposal {
+    bool done = false;
+
+    DSPause pause;
+    address action;
+    bytes payload;
+
+    constructor(DSPause pause_, address action_, bytes memory payload_) public {
+        pause = pause_;
+        action = action_;
+        payload = payload_;
+    }
+
+    function schedule() public returns (address, bytes memory, uint) {
+        require(!done);
+        done = true;
+
+        return pause.schedule(action, payload);
     }
 }
 
@@ -126,27 +151,6 @@ contract SimpleAction {
     }
 }
 
-contract SimpleProposal {
-    bool done = false;
-    SimpleAction action = new SimpleAction();
-
-    DSPause pause;
-    Target  target;
-
-    constructor(DSPause pause_, Target target_) public {
-        pause = pause_;
-        target = target_;
-    }
-
-    function execute() public returns (address, bytes memory, uint) {
-        require(!done);
-        done = true;
-
-        bytes memory callData = abi.encodeWithSignature("execute(address)", target);
-        return pause.schedule(address(action), callData);
-    }
-}
-
 contract Voting is Test {
 
     function test_simple_proposal() public {
@@ -157,7 +161,8 @@ contract Voting is Test {
         target.deny(address(this));
 
         // create proposal
-        SimpleProposal proposal = new SimpleProposal(pause, target);
+        SimpleAction action = new SimpleAction();
+        Proposal proposal = new Proposal(pause, address(action), abi.encodeWithSignature("execute(address)", target));
 
         // make proposal the hat
         user.lock(chief, votes);
@@ -165,7 +170,7 @@ contract Voting is Test {
         user.lift(chief, address(proposal));
 
         // execute proposal (schedule action)
-        (address who, bytes memory data, uint when) = proposal.execute();
+        (address who, bytes memory data, uint when) = proposal.schedule();
 
         // wait until delay is passed
         hevm.warp(now + delay);
@@ -220,31 +225,6 @@ contract Guard is DSAuthority {
     }
 }
 
-contract AddGuardProposal {
-    bool done = false;
-
-    Guard guard;
-    DSPause pause;
-
-    constructor(DSPause pause_, Guard guard_) public {
-        guard = guard_;
-        pause = pause_;
-    }
-
-    function execute() public returns (address, bytes memory, uint) {
-        require(!done);
-        done = true;
-
-        SetAuthority setAuthority = new SetAuthority();
-        return pause.schedule(
-            address(setAuthority),
-            abi.encodeWithSignature(
-                "set(address,address)",
-                pause, guard
-            )
-        );
-    }
-}
 
 contract UpgradeChief is Test {
 
@@ -263,7 +243,9 @@ contract UpgradeChief is Test {
         Guard guard = new Guard(lockGuardUntil, pause, address(newChief));
 
         // create gov proposal to transfer ownership from oldScheduler to guard
-        AddGuardProposal proposal = new AddGuardProposal(pause, guard);
+        SetAuthority setAuthority = new SetAuthority();
+        bytes memory payload = abi.encodeWithSignature("set(address,address)", pause, guard);
+        Proposal proposal = new Proposal(pause, address(setAuthority), payload);
 
         // check that the oldChief is the authority
         assertEq(address(pause.authority()), address(oldChief));
@@ -274,7 +256,7 @@ contract UpgradeChief is Test {
         user.lift(oldChief, address(proposal));
 
         // schedule ownership transfer from oldBridge to guard
-        (address who, bytes memory data, uint when) = proposal.execute();
+        (address who, bytes memory data, uint when) = proposal.schedule();
 
         // wait until delay is passed
         hevm.warp(now + delay);

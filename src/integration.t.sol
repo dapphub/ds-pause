@@ -31,19 +31,19 @@ contract Hevm {
     function warp(uint) public;
 }
 
-contract ProposalLike {
+contract PlanLike {
     function plot() public returns (bytes memory);
 }
 
 contract User {
-    function vote(DSChief chief, address proposal) public {
+    function vote(DSChief chief, address plan) public {
         address[] memory votes = new address[](1);
-        votes[0] = address(proposal);
+        votes[0] = address(plan);
         chief.vote(votes);
     }
 
-    function lift(DSChief chief, address proposal) external {
-        chief.lift(proposal);
+    function lift(DSChief chief, address plan) external {
+        chief.lift(plan);
     }
 
     function lock(DSChief chief, uint amount) public {
@@ -76,10 +76,10 @@ contract Target {
 }
 
 // ------------------------------------------------------------------
-// Gov Proposal Template
+// Gov Plan Template
 // ------------------------------------------------------------------
 
-contract Proposal {
+contract Plan {
     bool done = false;
 
     DSPause pause;
@@ -153,24 +153,24 @@ contract SimpleAction {
 
 contract Voting is Test {
 
-    function test_simple_proposal() public {
+    function test_simple_plan() public {
         // create gov system
         DSChief chief = chiefFab.newChief(gov, maxSlateSize);
         DSPause pause = new DSPause(delay, address(0x0), chief);
         target.rely(address(pause));
         target.deny(address(this));
 
-        // create proposal
+        // create plan
         SimpleAction action = new SimpleAction();
-        Proposal proposal = new Proposal(pause, address(action), abi.encodeWithSignature("exec(address)", target));
+        Plan plan = new Plan(pause, address(action), abi.encodeWithSignature("exec(address)", target));
 
-        // make proposal the hat
+        // make plan the hat
         user.lock(chief, votes);
-        user.vote(chief, address(proposal));
-        user.lift(chief, address(proposal));
+        user.vote(chief, address(plan));
+        user.lift(chief, address(plan));
 
-        // exec proposal (plot action)
-        (address who, bytes memory data, uint when) = proposal.plot();
+        // plot plan
+        (address who, bytes memory data, uint when) = plan.plot();
 
         // wait until delay is passed
         hevm.warp(now + delay);
@@ -242,21 +242,22 @@ contract UpgradeChief is Test {
         uint lockGuardUntil = now + 1000;
         Guard guard = new Guard(lockGuardUntil, pause, address(newChief));
 
-        // create gov proposal to transfer ownership from oldScheduler to guard
+        // create plan to transfer ownership from oldScheduler to guard
         SetAuthority setAuthority = new SetAuthority();
         bytes memory payload = abi.encodeWithSignature("set(address,address)", pause, guard);
-        Proposal proposal = new Proposal(pause, address(setAuthority), payload);
+
+        Plan plan = new Plan(pause, address(setAuthority), payload);
 
         // check that the oldChief is the authority
         assertEq(address(pause.authority()), address(oldChief));
 
-        // vote for proposal
+        // vote for plan
         user.lock(oldChief, votes);
-        user.vote(oldChief, address(proposal));
-        user.lift(oldChief, address(proposal));
+        user.vote(oldChief, address(plan));
+        user.lift(oldChief, address(plan));
 
         // plot ownership transfer from oldBridge to guard
-        (address who, bytes memory data, uint when) = proposal.plot();
+        (address who, bytes memory data, uint when) = plan.plot();
 
         // wait until delay is passed
         hevm.warp(now + delay);

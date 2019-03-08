@@ -29,7 +29,7 @@ contract DSPause is DSAuth {
     }
 
     // --- Data ---
-    mapping (bytes32 => bool) public plans;
+    mapping (bytes32 => bool) public plots;
     uint public delay;
 
     // --- Init ---
@@ -58,13 +58,13 @@ contract DSPause is DSAuth {
     }
 
     // --- Public ---
-    function plan(address usr, bytes memory arg)
+    function plot(address usr, bytes memory arg)
         public
         auth
         returns (address, bytes memory, uint)
     {
         bytes32 id = hash(usr, arg, now);
-        plans[id]  = true;
+        plots[id]  = true;
 
         return (usr, arg, now);
     }
@@ -74,7 +74,7 @@ contract DSPause is DSAuth {
         auth
     {
         bytes32 id = hash(usr, arg, era);
-        plans[id]  = false;
+        plots[id]  = false;
     }
 
     function exec(address usr, bytes memory arg, uint era)
@@ -84,9 +84,9 @@ contract DSPause is DSAuth {
         bytes32 id = hash(usr, arg, era);
 
         require(now >= add(era, delay), "ds-pause: delay not passed");
-        require(plans[id] == true,      "ds-pause: unplanned execution");
+        require(plots[id] == true,      "ds-pause: unplanned execution");
 
-        plans[id] = false;
+        plots[id] = false;
 
         // delegatecall implementation from ds-proxy
         assembly {

@@ -32,7 +32,7 @@ contract Hevm {
 }
 
 contract ProposalLike {
-    function plan() public returns (bytes memory);
+    function plot() public returns (bytes memory);
 }
 
 contract User {
@@ -92,11 +92,11 @@ contract Proposal {
         payload = payload_;
     }
 
-    function plan() public returns (address, bytes memory, uint) {
+    function plot() public returns (address, bytes memory, uint) {
         require(!done);
         done = true;
 
-        return pause.plan(action, payload);
+        return pause.plot(action, payload);
     }
 }
 
@@ -169,8 +169,8 @@ contract Voting is Test {
         user.vote(chief, address(proposal));
         user.lift(chief, address(proposal));
 
-        // exec proposal (plan action)
-        (address who, bytes memory data, uint when) = proposal.plan();
+        // exec proposal (plot action)
+        (address who, bytes memory data, uint when) = proposal.plot();
 
         // wait until delay is passed
         hevm.warp(now + delay);
@@ -207,7 +207,7 @@ contract Guard is DSAuthority {
     function canCall(address src, address dst, bytes4 sig) public view returns (bool) {
         require(src == address(this));
         require(dst == address(pause));
-        require(sig == bytes4(keccak256("plan(address,bytes)")));
+        require(sig == bytes4(keccak256("plot(address,bytes)")));
         return true;
     }
 
@@ -215,7 +215,7 @@ contract Guard is DSAuthority {
         require(now >= lockUntil);
 
         SetAuthority setAuthority = new SetAuthority();
-        return pause.plan(
+        return pause.plot(
             address(setAuthority),
             abi.encodeWithSignature(
                 "set(address,address)",
@@ -255,8 +255,8 @@ contract UpgradeChief is Test {
         user.vote(oldChief, address(proposal));
         user.lift(oldChief, address(proposal));
 
-        // plan ownership transfer from oldBridge to guard
-        (address who, bytes memory data, uint when) = proposal.plan();
+        // plot ownership transfer from oldBridge to guard
+        (address who, bytes memory data, uint when) = proposal.plot();
 
         // wait until delay is passed
         hevm.warp(now + delay);
@@ -274,7 +274,7 @@ contract UpgradeChief is Test {
         // wait until unlock period has passed
         hevm.warp(lockGuardUntil);
 
-        // plan ownership transfer from guard to newChief
+        // plot ownership transfer from guard to newChief
         (who, data, when) = guard.unlock();
 
         // wait until delay has passed

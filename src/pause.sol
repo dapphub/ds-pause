@@ -29,7 +29,7 @@ contract DSPause is DSAuth {
     }
 
     // --- Data ---
-    mapping (bytes32 => bool) public planned;
+    mapping (bytes32 => bool) public plans;
     uint public delay;
 
     // --- Init ---
@@ -49,48 +49,48 @@ contract DSPause is DSAuth {
         require(z >= x);
     }
 
-    function hash(address usr, bytes memory fax, uint era)
+    function hash(address usr, bytes memory arg, uint era)
         internal
         pure
         returns (bytes32)
     {
-        return keccak256(abi.encode(usr, fax, era));
+        return keccak256(abi.encode(usr, arg, era));
     }
 
     // --- Public ---
-    function plan(address usr, bytes memory fax)
+    function plan(address usr, bytes memory arg)
         public
         auth
         returns (address, bytes memory, uint)
     {
-        bytes32 id  = hash(usr, fax, now);
-        planned[id] = true;
+        bytes32 id = hash(usr, arg, now);
+        plans[id]  = true;
 
-        return (usr, fax, now);
+        return (usr, arg, now);
     }
 
-    function drop(address usr, bytes memory fax, uint era)
+    function drop(address usr, bytes memory arg, uint era)
         public
         auth
     {
-        bytes32 id  = hash(usr, fax, era);
-        planned[id] = false;
+        bytes32 id = hash(usr, arg, era);
+        plans[id]  = false;
     }
 
-    function exec(address usr, bytes memory fax, uint era)
+    function exec(address usr, bytes memory arg, uint era)
         public
         returns (bytes memory response)
     {
-        bytes32 id = hash(usr, fax, era);
+        bytes32 id = hash(usr, arg, era);
 
         require(now >= add(era, delay), "ds-pause: delay not passed");
-        require(planned[id] == true,    "ds-pause: unplanned execution");
+        require(plans[id] == true,      "ds-pause: unplanned execution");
 
-        planned[id] = false;
+        plans[id] = false;
 
         // delegatecall implementation from ds-proxy
         assembly {
-            let succeeded := delegatecall(sub(gas, 5000), usr, add(fax, 0x20), mload(fax), 0, 0)
+            let succeeded := delegatecall(sub(gas, 5000), usr, add(arg, 0x20), mload(arg), 0, 0)
             let size := returndatasize
 
             response := mload(0x40)

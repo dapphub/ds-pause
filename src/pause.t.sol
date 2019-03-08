@@ -167,7 +167,7 @@ contract Schedule is Test {
         (address guy, bytes memory dataOut, uint when) = pause.plan(address(target), data);
 
         bytes32 id = keccak256(abi.encode(guy, dataOut, when));
-        assertTrue(pause.planned(id));
+        assertTrue(pause.plans(id));
     }
 
     function test_return_data() public {
@@ -236,7 +236,7 @@ contract Cancel is Test {
         pause.drop(guy, data, when);
 
         bytes32 id = keccak256(abi.encode(guy, data, when));
-        assertTrue(!pause.planned(id));
+        assertTrue(!pause.plans(id));
     }
 
 }

@@ -31,19 +31,19 @@ contract Hevm {
     function warp(uint) public;
 }
 
-contract PlanLike {
-    function plot() public returns (bytes memory);
+contract ProposalLike {
+    function plan() public returns (bytes memory);
 }
 
 contract User {
-    function vote(DSChief chief, address plan) public {
+    function vote(DSChief chief, address proposal) public {
         address[] memory votes = new address[](1);
-        votes[0] = address(plan);
+        votes[0] = address(proposal);
         chief.vote(votes);
     }
 
-    function lift(DSChief chief, address plan) external {
-        chief.lift(plan);
+    function lift(DSChief chief, address proposal) public {
+        chief.lift(proposal);
     }
 
     function lock(DSChief chief, uint amount) public {
@@ -76,10 +76,10 @@ contract Target {
 }
 
 // ------------------------------------------------------------------
-// Gov Plan Template
+// Gov Proposal Template
 // ------------------------------------------------------------------
 
-contract Plan {
+contract Proposal {
     bool done = false;
 
     DSPause pause;
@@ -92,11 +92,11 @@ contract Plan {
         payload = payload_;
     }
 
-    function plot() public returns (address, bytes memory, uint) {
+    function plan() public returns (address, bytes memory, uint) {
         require(!done);
         done = true;
 
-        return pause.plot(action, payload);
+        return pause.plan(action, payload);
     }
 }
 
@@ -119,7 +119,7 @@ contract Test is DSTest {
     uint votes = 100;
     uint maxSlateSize = 1;
 
-    // gov system
+    // voting token
     DSToken gov;
 
     function setUp() public {
@@ -153,24 +153,24 @@ contract SimpleAction {
 
 contract Voting is Test {
 
-    function test_simple_plan() public {
+    function test_simple_proposal() public {
         // create gov system
         DSChief chief = chiefFab.newChief(gov, maxSlateSize);
         DSPause pause = new DSPause(delay, address(0x0), chief);
         target.rely(address(pause));
         target.deny(address(this));
 
-        // create plan
+        // create proposal
         SimpleAction action = new SimpleAction();
-        Plan plan = new Plan(pause, address(action), abi.encodeWithSignature("exec(address)", target));
+        Proposal proposal = new Proposal(pause, address(action), abi.encodeWithSignature("exec(address)", target));
 
-        // make plan the hat
+        // make proposal the hat
         user.lock(chief, votes);
-        user.vote(chief, address(plan));
-        user.lift(chief, address(plan));
+        user.vote(chief, address(proposal));
+        user.lift(chief, address(proposal));
 
-        // plot plan
-        (address who, bytes memory data, uint when) = plan.plot();
+        // plan execution
+        (address who, bytes memory data, uint when) = proposal.plan();
 
         // wait until delay is passed
         hevm.warp(now + delay);
@@ -207,7 +207,7 @@ contract Guard is DSAuthority {
     function canCall(address src, address dst, bytes4 sig) public view returns (bool) {
         require(src == address(this));
         require(dst == address(pause));
-        require(sig == bytes4(keccak256("plot(address,bytes)")));
+        require(sig == bytes4(keccak256("plan(address,bytes)")));
         return true;
     }
 
@@ -215,7 +215,7 @@ contract Guard is DSAuthority {
         require(now >= lockUntil);
 
         SetAuthority setAuthority = new SetAuthority();
-        return pause.plot(
+        return pause.plan(
             address(setAuthority),
             abi.encodeWithSignature(
                 "set(address,address)",
@@ -242,28 +242,28 @@ contract UpgradeChief is Test {
         uint lockGuardUntil = now + 1000;
         Guard guard = new Guard(lockGuardUntil, pause, address(newChief));
 
-        // create plan to transfer ownership from oldScheduler to guard
-        SetAuthority setAuthority = new SetAuthority();
-        bytes memory payload = abi.encodeWithSignature("set(address,address)", pause, guard);
-
-        Plan plan = new Plan(pause, address(setAuthority), payload);
-
         // check that the oldChief is the authority
         assertEq(address(pause.authority()), address(oldChief));
 
-        // vote for plan
-        user.lock(oldChief, votes);
-        user.vote(oldChief, address(plan));
-        user.lift(oldChief, address(plan));
+        // create a proposal to transfer ownership from oldChief to guard
+        SetAuthority setAuthority = new SetAuthority();
+        bytes memory payload = abi.encodeWithSignature("set(address,address)", pause, guard);
 
-        // plot ownership transfer from oldBridge to guard
-        (address who, bytes memory data, uint when) = plan.plot();
+        Proposal proposal = new Proposal(pause, address(setAuthority), payload);
+
+        // vote for the proposal
+        user.lock(oldChief, votes);
+        user.vote(oldChief, address(proposal));
+        user.lift(oldChief, address(proposal));
+
+        // add the execution to the pause
+        (address user, bytes memory data, uint when) = proposal.plan();
 
         // wait until delay is passed
         hevm.warp(now + delay);
 
         // exec ownership transfer from oldBridge to guard
-        pause.exec(who, data, when);
+        pause.exec(user, data, when);
 
         // check that the guard is the authority
         assertEq(address(pause.authority()), address(guard));
@@ -275,14 +275,14 @@ contract UpgradeChief is Test {
         // wait until unlock period has passed
         hevm.warp(lockGuardUntil);
 
-        // plot ownership transfer from guard to newChief
-        (who, data, when) = guard.unlock();
+        // plan ownership transfer from guard to newChief
+        (user, data, when) = guard.unlock();
 
         // wait until delay has passed
         hevm.warp(now + delay);
 
         // exec ownership transfer from guard to newChief
-        pause.exec(who, data, when);
+        pause.exec(user, data, when);
 
         // check that the new chief is the authority
         assertEq(address(pause.authority()), address(newChief));

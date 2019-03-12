@@ -94,7 +94,7 @@ contract Constructor is DSTest {
     }
 
     function test_owner_set() public {
-        DSPause pause = new DSPause(100, address(0xdeadbeef), address(0x0));
+        DSPause pause = new DSPause(100, address(0xdeadbeef), Authority(0x0));
         assertEq(address(pause.owner()), address(0xdeadbeef));
     }
 
@@ -164,7 +164,7 @@ contract Plan is Test {
     function test_plan() public {
         bytes memory data = abi.encodeWithSignature("getBytes32()");
 
-        (address user, _, uint when) = pause.plan(address(target), data);
+        (address user, bytes memory _, uint when) = pause.plan(address(target), data);
 
         bytes32 id = keccak256(abi.encode(user, data, when));
         assertTrue(pause.plans(id));

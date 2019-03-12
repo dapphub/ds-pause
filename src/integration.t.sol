@@ -35,7 +35,7 @@ contract ProposalLike {
     function plan() public returns (bytes memory);
 }
 
-contract User {
+contract Voter {
     function vote(DSChief chief, address proposal) public {
         address[] memory votes = new address[](1);
         votes[0] = address(proposal);
@@ -109,7 +109,7 @@ contract Test is DSTest {
     Hevm hevm;
     DSChiefFab chiefFab;
     Target target;
-    User user;
+    Voter voter;
 
     // pause timings
     uint start = 0;
@@ -129,11 +129,11 @@ contract Test is DSTest {
 
         // create test harness
         target = new Target();
-        user = new User();
+        voter = new Voter();
 
         // create gov token
         gov = new DSToken("GOV");
-        gov.mint(address(user), votes);
+        gov.mint(address(voter), votes);
         gov.setOwner(address(0));
 
         // chief fab
@@ -157,6 +157,8 @@ contract Voting is Test {
         // create gov system
         DSChief chief = chiefFab.newChief(gov, maxSlateSize);
         DSPause pause = new DSPause(delay, address(0x0), chief);
+
+        // attach gov system to target
         target.rely(address(pause));
         target.deny(address(this));
 
@@ -165,19 +167,19 @@ contract Voting is Test {
         Proposal proposal = new Proposal(pause, address(action), abi.encodeWithSignature("exec(address)", target));
 
         // make proposal the hat
-        user.lock(chief, votes);
-        user.vote(chief, address(proposal));
-        user.lift(chief, address(proposal));
+        voter.lock(chief, votes);
+        voter.vote(chief, address(proposal));
+        voter.lift(chief, address(proposal));
 
         // plan execution
-        (address who, bytes memory data, uint when) = proposal.plan();
+        (address user, bytes memory data, uint when) = proposal.plan();
 
         // wait until delay is passed
         hevm.warp(now + delay);
 
         // exec action
         assertEq(target.val(), 0);
-        pause.exec(who, data, when);
+        pause.exec(user, data, when);
         assertEq(target.val(), 1);
     }
 
@@ -232,6 +234,8 @@ contract UpgradeChief is Test {
         // create gov system
         DSChief oldChief = chiefFab.newChief(gov, maxSlateSize);
         DSPause pause = new DSPause(delay, address(0x0), oldChief);
+
+        // attach gov system to target
         target.rely(address(pause));
         target.deny(address(this));
 
@@ -248,13 +252,12 @@ contract UpgradeChief is Test {
         // create a proposal to transfer ownership from oldChief to guard
         SetAuthority setAuthority = new SetAuthority();
         bytes memory payload = abi.encodeWithSignature("set(address,address)", pause, guard);
-
         Proposal proposal = new Proposal(pause, address(setAuthority), payload);
 
         // vote for the proposal
-        user.lock(oldChief, votes);
-        user.vote(oldChief, address(proposal));
-        user.lift(oldChief, address(proposal));
+        voter.lock(oldChief, votes);
+        voter.vote(oldChief, address(proposal));
+        voter.lift(oldChief, address(proposal));
 
         // add the execution to the pause
         (address user, bytes memory data, uint when) = proposal.plan();
@@ -269,8 +272,8 @@ contract UpgradeChief is Test {
         assertEq(address(pause.authority()), address(guard));
 
         // move MKR from old chief to new chief
-        user.free(oldChief, votes);
-        user.lock(newChief, votes);
+        voter.free(oldChief, votes);
+        voter.lock(newChief, votes);
 
         // wait until unlock period has passed
         hevm.warp(lockGuardUntil);

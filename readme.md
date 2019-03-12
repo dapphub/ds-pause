@@ -16,18 +16,19 @@ can only be called by the pause itself. This means that they can only be called 
 
 - Initializes a new instance of the contract with a delay in ms
 
-**`schedule(address guy, bytes memory data) auth returns (address, bytes memory, uint256)`**
+**`plan(address user, bytes memory data) auth returns (address, bytes memory, uint256)`**
 
-- Schedule a call with `data` calldata to address `guy`.
-- Returns all data needed to execute or cancel the scheduled call
+- Plan a call with `data` calldata to address `user`
+- Returns all data needed to execute or cancel the planned call
 
-**`cancel(address guy, bytes memory data, uint256 when) auth`**
+**`drop(address user, bytes memory data, uint256 when) auth`**
 
-- Cancels a scheduled execution.
+- Cancels a planned execution
 
-**`execute(address guy, bytes memory data, uint256 when) returns (bytes memory response)`**
+**`exec(address user, bytes memory data, uint256 when) returns (bytes memory response)`**
 
-- Executes the given function call (using `delegatecall`) as long as the delay period has passed.
+- Executes the given function call (using `delegatecall`) as long as the execution has been planned
+  and the delay period has passed.
 - Returns the `delegatecall` output
 
 ## Tests

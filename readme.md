@@ -7,8 +7,8 @@ This can be useful as a security component within a governance system, to ensure
 ## Auth
 
 `ds-pause` uses a slightly modified form of the `ds-auth` scheme. Both `setOwner` and `setAuthority`
-can only be called by the pause itself. This means that they can only be called by using `schedule` /
-`execute` on the pause, and changes to auth are therefore also subject to a delay.
+can only be called by the pause itself. This means that they can only be called by using `plan` /
+`exec` on the pause, and changes to auth are therefore also subject to a delay.
 
 ## Interface
 

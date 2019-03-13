@@ -15,92 +15,87 @@
 
 pragma solidity >=0.5.0 <0.6.0;
 
-import "ds-auth/auth.sol";
-
-contract DSPause is DSAuth {
-    // --- Auth ---
-    function setOwner(address owner_) public {
-        require(msg.sender == address(this), "ds-pause: changes to ownership must be delayed");
-        super.setOwner(owner_);
+contract DSPause {
+    // --- auth ---
+    address public owner;
+    function give(address usr) public {
+        require(msg.sender == address(this), "ds-pause-undelayed-ownership-update");
+        owner = usr;
     }
-    function setAuthority(DSAuthority authority_) public {
-        require(msg.sender == address(this), "ds-pause: changes to authority must be delayed");
-        super.setAuthority(authority_);
+    modifier auth() {
+        require(msg.sender == owner);
+        _;
     }
 
-    // --- Data ---
-    mapping (bytes32 => bool) public scheduled;
+    // --- math ---
+    function add(uint x, uint y) internal pure returns (uint z) {
+        z = x + y;
+        require(z >= x);
+    }
+
+    // --- logs ---
+    event Plan(address usr, bytes arg, uint era);
+    event Drop(address usr, bytes arg, uint era);
+    event Exec(address usr, bytes arg, uint era);
+
+    // --- data ---
+    mapping (bytes32 => bool) public planned;
     uint public delay;
 
-    // --- Init ---
+    // --- init ---
     constructor(uint delay_, address owner_, DSAuthority authority_) public {
         delay = delay_;
         owner = owner_;
         authority = authority_;
     }
 
-    // --- Internal ---
-    function add(uint x, uint y)
-        internal
-        pure
-        returns (uint z)
-    {
-        z = x + y;
-        require(z >= x);
-    }
-
-    function tag(address guy, bytes memory data, uint when)
+    // --- util ---
+    function hash(address usr, bytes memory arg, uint era)
         internal
         pure
         returns (bytes32)
     {
-        return keccak256(abi.encode(guy, data, when));
+        return keccak256(abi.encode(usr, arg, era));
     }
 
-    // --- Public ---
-    function schedule(address guy, bytes memory data)
-        public
-        auth
-        returns (address, bytes memory, uint)
-    {
-        bytes32 id = tag(guy, data, now);
-        scheduled[id] = true;
-        return (guy, data, now);
-    }
-
-    function cancel(address guy, bytes memory data, uint when)
+    // --- executions ---
+    function plan(address usr, bytes memory arg, uint era)
         public
         auth
     {
-        bytes32 id = tag(guy, data, when);
-        scheduled[id] = false;
+        require(era > add(block.timestamp, delay), "ds-pause-must-respect-delay")
+
+        bytes32 id  = hash(usr, arg, era);
+        planned[id] = true;
+
+        emit Plan(usr, arg, era);
     }
 
-    function execute(address guy, bytes memory data, uint when)
+    function drop(address usr, bytes memory arg, uint era)
         public
-        returns (bytes memory response)
+        auth
     {
-        bytes32 id = tag(guy, data, when);
+        bytes32 id  = hash(usr, arg, era);
+        planned[id] = false;
 
-        require(now >= add(when, delay), "ds-pause: delay not passed");
-        require(scheduled[id] == true,   "ds-pause: unscheduled execution");
+        emit Drop(usr, arg, era);
+    }
 
-        scheduled[id] = false;
+    function exec(address usr, bytes memory arg, uint era)
+        public
+        returns (bytes memory)
+    {
+        bytes32 id = hash(usr, arg, era);
 
-        // delegatecall implementation from ds-proxy
-        assembly {
-            let succeeded := delegatecall(sub(gas, 5000), guy, add(data, 0x20), mload(data), 0, 0)
-            let size := returndatasize
+        require(planned[id] == true,    "ds-pause-unplanned-execution");
+        require(block.timestamp >= era, "ds-pause-execution-too-soon");
 
-            response := mload(0x40)
-            mstore(0x40, add(response, and(add(add(size, 0x20), 0x1f), not(0x1f))))
-            mstore(response, size)
-            returndatacopy(add(response, 0x20), 0, size)
+        planned[id] = false;
 
-            switch iszero(succeeded)
-            case 1 {
-                revert(add(response, 0x20), size)
-            }
-        }
+        (bool ok, bytes memory res) = usr.delegatecall(arg);
+        require(ok, "ds-pause-delegatecall-failed");
+
+        emit Exec(usr, arg, era);
+        return res;
     }
 }

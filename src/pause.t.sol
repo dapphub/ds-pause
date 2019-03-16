@@ -28,7 +28,7 @@ contract Hevm {
 }
 
 contract Target {
-    function getBytes32() public pure returns (bytes32) {
+    function get() public pure returns (bytes32) {
         return bytes32("Hello");
     }
 }
@@ -161,7 +161,7 @@ contract Plan is Test {
     }
 
     function test_plan() public {
-        bytes memory dataIn = abi.encodeWithSignature("getBytes32()");
+        bytes memory dataIn = abi.encodeWithSignature("get()");
 
         (address usr, bytes memory dataOut, uint when) = pause.plan(address(target), dataIn);
 
@@ -170,7 +170,7 @@ contract Plan is Test {
     }
 
     function test_return_data() public {
-        bytes memory dataIn = abi.encodeWithSignature("getBytes32()");
+        bytes memory dataIn = abi.encodeWithSignature("get()");
 
         (address usr, bytes memory dataOut, uint when) = pause.plan(address(target), dataIn);
 
@@ -189,7 +189,7 @@ contract Exec is Test {
     }
 
     function testFail_double_execution() public {
-        (address usr, bytes memory fax, uint when) = pause.plan(address(target), abi.encodeWithSignature("getBytes32()"));
+        (address usr, bytes memory fax, uint when) = pause.plan(address(target), abi.encodeWithSignature("get()"));
         hevm.warp(now + delay);
 
         pause.exec(usr, fax, when);
@@ -197,7 +197,7 @@ contract Exec is Test {
     }
 
     function test_exec_delay_passed() public {
-        (address usr, bytes memory fax, uint when) = pause.plan(address(target), abi.encodeWithSignature("getBytes32()"));
+        (address usr, bytes memory fax, uint when) = pause.plan(address(target), abi.encodeWithSignature("get()"));
         hevm.warp(now + delay);
 
         bytes memory response = pause.exec(usr, fax, when);
@@ -210,7 +210,7 @@ contract Exec is Test {
     }
 
     function test_call_from_non_owner() public {
-        (address usr, bytes memory fax, uint when) = pause.plan(address(target), abi.encodeWithSignature("getBytes32()"));
+        (address usr, bytes memory fax, uint when) = pause.plan(address(target), abi.encodeWithSignature("get()"));
         hevm.warp(now + delay);
 
         stranger.call(address(pause), abi.encodeWithSignature("exec(address,bytes,uint256)", usr, fax, when));
@@ -221,7 +221,7 @@ contract Exec is Test {
 contract Drop is Test {
 
     function testFail_call_from_non_owner() public {
-        (address usr, bytes memory fax, uint era) = pause.plan(address(target), abi.encodeWithSignature("getBytes32()"));
+        (address usr, bytes memory fax, uint era) = pause.plan(address(target), abi.encodeWithSignature("get()"));
         hevm.warp(now + delay);
 
         bytes memory data = abi.encodeWithSignature("drop(address,bytes,uint256)", usr, fax, era);
@@ -229,7 +229,7 @@ contract Drop is Test {
     }
 
     function test_drop_planned_execution() public {
-        (address usr, bytes memory fax, uint era) = pause.plan(address(target), abi.encodeWithSignature("getBytes32()"));
+        (address usr, bytes memory fax, uint era) = pause.plan(address(target), abi.encodeWithSignature("get()"));
         hevm.warp(now + delay);
 
         pause.drop(usr, fax, era);

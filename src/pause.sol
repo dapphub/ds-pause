@@ -20,18 +20,18 @@ import "ds-auth/auth.sol";
 contract DSPause is DSAuth {
     // --- auth ---
     function setOwner(address owner_) public {
-        require(msg.sender == address(this), "ds-pause: changes to ownership must be delayed");
+        require(msg.sender == address(this), "ds-pause-undelayed-ownership-change");
         super.setOwner(owner_);
     }
     function setAuthority(DSAuthority authority_) public {
-        require(msg.sender == address(this), "ds-pause: changes to authority must be delayed");
+        require(msg.sender == address(this), "ds-pause-undelayed-authority-change");
         super.setAuthority(authority_);
     }
 
     // --- math ---
     function add(uint x, uint y) internal pure returns (uint z) {
         z = x + y;
-        require(z >= x);
+        require(z >= x, "ds-pause-addition-overflow");
     }
 
     // --- logs ---
@@ -89,8 +89,8 @@ contract DSPause is DSAuth {
     {
         bytes32 id = hash(usr, fax, era);
 
-        require(now >= add(era, delay), "ds-pause: delay not passed");
-        require(planned[id] == true,    "ds-pause: unplanned execution");
+        require(now >= add(era, delay), "ds-pause-delay-not-elapsed");
+        require(planned[id] == true,    "ds-pause-unplanned-execution");
 
         planned[id] = false;
 

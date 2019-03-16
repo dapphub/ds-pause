@@ -34,6 +34,11 @@ contract DSPause is DSAuth {
         require(z >= x);
     }
 
+    // --- logs ---
+    event Plan(address usr, bytes fax, uint era);
+    event Drop(address usr, bytes fax, uint era);
+    event Exec(address usr, bytes fax, uint era);
+
     // --- data ---
     mapping (bytes32 => bool) public planned;
     uint public delay;
@@ -63,6 +68,8 @@ contract DSPause is DSAuth {
     {
         bytes32 id  = hash(usr, fax, now);
         planned[id] = true;
+
+        emit Plan(usr, fax, now);
         return (usr, fax, now);
     }
 
@@ -72,6 +79,8 @@ contract DSPause is DSAuth {
     {
         bytes32 id  = hash(usr, fax, era);
         planned[id] = false;
+
+        emit Drop(usr, fax, era);
     }
 
     function exec(address usr, bytes memory fax, uint era)
@@ -100,5 +109,7 @@ contract DSPause is DSAuth {
                 revert(add(response, 0x20), size)
             }
         }
+
+        emit Exec(usr, fax, era);
     }
 }

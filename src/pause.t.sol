@@ -127,10 +127,10 @@ contract Auth is Test {
         SetOwner setOwner = new SetOwner();
 
         bytes memory payload = abi.encodeWithSignature("set(address,address)", pause, 0xdeadbeef);
-        (address who, bytes memory fax, uint when) = pause.plan(address(setOwner), payload);
+        (address who, bytes memory fax, uint era) = pause.plan(address(setOwner), payload);
 
         hevm.warp(now + delay);
-        pause.exec(who, fax, when);
+        pause.exec(who, fax, era);
 
         assertEq(address(pause.owner()), address(0xdeadbeef));
     }
@@ -144,10 +144,10 @@ contract Auth is Test {
         Authority newAuthority = new Authority();
 
         bytes memory payload = abi.encodeWithSignature("set(address,address)", pause, newAuthority);
-        (address who, bytes memory fax, uint when) = pause.plan(address(setAuthority), payload);
+        (address who, bytes memory fax, uint era) = pause.plan(address(setAuthority), payload);
 
         hevm.warp(now + delay);
-        pause.exec(who, fax, when);
+        pause.exec(who, fax, era);
 
         assertEq(address(pause.authority()), address(newAuthority));
     }
@@ -161,22 +161,22 @@ contract Plan is Test {
     }
 
     function test_plan() public {
-        bytes memory dataIn = abi.encodeWithSignature("get()");
+        bytes memory sig = abi.encodeWithSignature("get()");
 
-        (address usr, bytes memory dataOut, uint when) = pause.plan(address(target), dataIn);
+        (address usr, bytes memory fax, uint era) = pause.plan(address(target), sig);
 
-        bytes32 id = keccak256(abi.encode(usr, dataOut, when));
+        bytes32 id = keccak256(abi.encode(usr, fax, era));
         assertTrue(pause.planned(id));
     }
 
     function test_return_data() public {
-        bytes memory dataIn = abi.encodeWithSignature("get()");
+        bytes memory sig = abi.encodeWithSignature("get()");
 
-        (address usr, bytes memory dataOut, uint when) = pause.plan(address(target), dataIn);
+        (address usr, bytes memory fax, uint era) = pause.plan(address(target), sig);
 
-        assertEq0(dataIn, dataOut);
+        assertEq0(sig, fax);
         assertEq(usr, address(target));
-        assertEq(when, now);
+        assertEq(era, now);
     }
 
 }
@@ -184,23 +184,25 @@ contract Plan is Test {
 contract Exec is Test {
 
     function testFail_delay_not_passed() public {
-        (address usr, bytes memory fax, uint when) = pause.plan(address(target), abi.encode(0));
-        pause.exec(usr, fax, when);
+        (address usr, bytes memory fax, uint era) = pause.plan(address(target), abi.encode(0));
+        pause.exec(usr, fax, era);
     }
 
     function testFail_double_execution() public {
-        (address usr, bytes memory fax, uint when) = pause.plan(address(target), abi.encodeWithSignature("get()"));
+        bytes memory sig = abi.encodeWithSignature("get()");
+        (address usr, bytes memory fax, uint era) = pause.plan(address(target), sig);
         hevm.warp(now + delay);
 
-        pause.exec(usr, fax, when);
-        pause.exec(usr, fax, when);
+        pause.exec(usr, fax, era);
+        pause.exec(usr, fax, era);
     }
 
     function test_exec_delay_passed() public {
-        (address usr, bytes memory fax, uint when) = pause.plan(address(target), abi.encodeWithSignature("get()"));
-        hevm.warp(now + delay);
+        bytes memory sig = abi.encodeWithSignature("get()");
+        (address usr, bytes memory fax, uint era) = pause.plan(address(target), sig);
 
-        bytes memory response = pause.exec(usr, fax, when);
+        hevm.warp(now + delay);
+        bytes memory response = pause.exec(usr, fax, era);
 
         bytes32 response32;
         assembly {
@@ -210,10 +212,11 @@ contract Exec is Test {
     }
 
     function test_call_from_non_owner() public {
-        (address usr, bytes memory fax, uint when) = pause.plan(address(target), abi.encodeWithSignature("get()"));
-        hevm.warp(now + delay);
+        bytes memory sig = abi.encodeWithSignature("get()");
+        (address usr, bytes memory fax, uint era) = pause.plan(address(target), sig);
 
-        stranger.call(address(pause), abi.encodeWithSignature("exec(address,bytes,uint256)", usr, fax, when));
+        hevm.warp(now + delay);
+        stranger.call(address(pause), abi.encodeWithSignature("exec(address,bytes,uint256)", usr, fax, era));
     }
 
 }
@@ -221,7 +224,8 @@ contract Exec is Test {
 contract Drop is Test {
 
     function testFail_call_from_non_owner() public {
-        (address usr, bytes memory fax, uint era) = pause.plan(address(target), abi.encodeWithSignature("get()"));
+        bytes memory sig = abi.encodeWithSignature("get()");
+        (address usr, bytes memory fax, uint era) = pause.plan(address(target), sig);
         hevm.warp(now + delay);
 
         bytes memory data = abi.encodeWithSignature("drop(address,bytes,uint256)", usr, fax, era);
@@ -229,9 +233,10 @@ contract Drop is Test {
     }
 
     function test_drop_planned_execution() public {
-        (address usr, bytes memory fax, uint era) = pause.plan(address(target), abi.encodeWithSignature("get()"));
-        hevm.warp(now + delay);
+        bytes memory sig = abi.encodeWithSignature("get()");
+        (address usr, bytes memory fax, uint era) = pause.plan(address(target), sig);
 
+        hevm.warp(now + delay);
         pause.drop(usr, fax, era);
 
         bytes32 id = keccak256(abi.encode(usr, fax, era));

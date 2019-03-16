@@ -17,7 +17,6 @@ pragma solidity >=0.5.0 <0.6.0;
 
 import "ds-test/test.sol";
 import "ds-chief/chief.sol";
-import "ds-spell/spell.sol";
 import "ds-token/token.sol";
 import "ds-proxy/proxy.sol";
 
@@ -32,10 +31,10 @@ contract Hevm {
 }
 
 contract ProposalLike {
-    function schedule() public returns (bytes memory);
+    function plan() public returns (bytes memory);
 }
 
-contract User {
+contract Voter {
     function vote(DSChief chief, address proposal) public {
         address[] memory votes = new address[](1);
         votes[0] = address(proposal);
@@ -61,8 +60,8 @@ contract User {
 
 contract Target {
     mapping (address => uint) public wards;
-    function rely(address guy) public auth { wards[guy] = 1; }
-    function deny(address guy) public auth { wards[guy] = 0; }
+    function rely(address usr) public auth { wards[usr] = 1; }
+    function deny(address usr) public auth { wards[usr] = 0; }
     modifier auth { require(wards[msg.sender] == 1); _; }
 
     constructor() public {
@@ -92,11 +91,11 @@ contract Proposal {
         payload = payload_;
     }
 
-    function schedule() public returns (address, bytes memory, uint) {
+    function plan() public returns (address, bytes memory, uint) {
         require(!done);
         done = true;
 
-        return pause.schedule(action, payload);
+        return pause.plan(action, payload);
     }
 }
 
@@ -109,7 +108,7 @@ contract Test is DSTest {
     Hevm hevm;
     DSChiefFab chiefFab;
     Target target;
-    User user;
+    Voter voter;
 
     // pause timings
     uint start = 0;
@@ -129,11 +128,11 @@ contract Test is DSTest {
 
         // create test harness
         target = new Target();
-        user = new User();
+        voter = new Voter();
 
         // create gov token
         gov = new DSToken("GOV");
-        gov.mint(address(user), votes);
+        gov.mint(address(voter), votes);
         gov.setOwner(address(0));
 
         // chief fab
@@ -146,7 +145,7 @@ contract Test is DSTest {
 // ------------------------------------------------------------------
 
 contract SimpleAction {
-    function execute(Target target) public {
+    function exec(Target target) public {
         target.set(1);
     }
 }
@@ -162,22 +161,22 @@ contract Voting is Test {
 
         // create proposal
         SimpleAction action = new SimpleAction();
-        Proposal proposal = new Proposal(pause, address(action), abi.encodeWithSignature("execute(address)", target));
+        Proposal proposal = new Proposal(pause, address(action), abi.encodeWithSignature("exec(address)", target));
 
         // make proposal the hat
-        user.lock(chief, votes);
-        user.vote(chief, address(proposal));
-        user.lift(chief, address(proposal));
+        voter.lock(chief, votes);
+        voter.vote(chief, address(proposal));
+        voter.lift(chief, address(proposal));
 
-        // execute proposal (schedule action)
-        (address who, bytes memory data, uint when) = proposal.schedule();
+        // execute proposal (plan action)
+        (address usr, bytes memory fax, uint era) = proposal.plan();
 
         // wait until delay is passed
         hevm.warp(now + delay);
 
         // execute action
         assertEq(target.val(), 0);
-        pause.execute(who, data, when);
+        pause.exec(usr, fax, era);
         assertEq(target.val(), 1);
     }
 
@@ -188,8 +187,8 @@ contract Voting is Test {
 // ------------------------------------------------------------------
 
 contract SetAuthority {
-    function set(DSAuth guy, DSAuthority authority) public {
-        guy.setAuthority(authority);
+    function set(DSAuth usr, DSAuthority authority) public {
+        usr.setAuthority(authority);
     }
 }
 
@@ -207,7 +206,7 @@ contract Guard is DSAuthority {
     function canCall(address src, address dst, bytes4 sig) public view returns (bool) {
         require(src == address(this));
         require(dst == address(pause));
-        require(sig == bytes4(keccak256("schedule(address,bytes)")));
+        require(sig == bytes4(keccak256("plan(address,bytes)")));
         return true;
     }
 
@@ -215,7 +214,7 @@ contract Guard is DSAuthority {
         require(now >= lockUntil);
 
         SetAuthority setAuthority = new SetAuthority();
-        return pause.schedule(
+        return pause.plan(
             address(setAuthority),
             abi.encodeWithSignature(
                 "set(address,address)",
@@ -251,37 +250,37 @@ contract UpgradeChief is Test {
         assertEq(address(pause.authority()), address(oldChief));
 
         // vote for proposal
-        user.lock(oldChief, votes);
-        user.vote(oldChief, address(proposal));
-        user.lift(oldChief, address(proposal));
+        voter.lock(oldChief, votes);
+        voter.vote(oldChief, address(proposal));
+        voter.lift(oldChief, address(proposal));
 
-        // schedule ownership transfer from oldBridge to guard
-        (address who, bytes memory data, uint when) = proposal.schedule();
+        // plan ownership transfer from oldBridge to guard
+        (address usr, bytes memory fax, uint era) = proposal.plan();
 
         // wait until delay is passed
         hevm.warp(now + delay);
 
         // execute ownership transfer from oldBridge to guard
-        pause.execute(who, data, when);
+        pause.exec(usr, fax, era);
 
         // check that the guard is the authority
         assertEq(address(pause.authority()), address(guard));
 
         // move MKR from old chief to new chief
-        user.free(oldChief, votes);
-        user.lock(newChief, votes);
+        voter.free(oldChief, votes);
+        voter.lock(newChief, votes);
 
         // wait until unlock period has passed
         hevm.warp(lockGuardUntil);
 
-        // schedule ownership transfer from guard to newChief
-        (who, data, when) = guard.unlock();
+        // plan ownership transfer from guard to newChief
+        (usr, fax, era) = guard.unlock();
 
         // wait until delay has passed
         hevm.warp(now + delay);
 
         // execute ownership transfer from guard to newChief
-        pause.execute(who, data, when);
+        pause.exec(usr, fax, era);
 
         // check that the new chief is the authority
         assertEq(address(pause.authority()), address(newChief));

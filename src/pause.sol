@@ -34,9 +34,9 @@ contract DSPause {
     }
 
     // --- logs ---
-    event Plan(address usr, bytes arg, uint era);
-    event Drop(address usr, bytes arg, uint era);
-    event Exec(address usr, bytes arg, uint era);
+    event Plan(address usr, bytes arg, uint era, uint val);
+    event Drop(address usr, bytes arg, uint era, uint val);
+    event Exec(address usr, bytes arg, uint era, uint val);
 
     // --- data ---
     mapping (bytes32 => bool) public planned;
@@ -50,52 +50,54 @@ contract DSPause {
     }
 
     // --- util ---
-    function hash(address usr, bytes memory arg, uint era)
+    function hash(address usr, bytes memory arg, uint era, uint val)
         internal
         pure
         returns (bytes32)
     {
-        return keccak256(abi.encode(usr, arg, era));
+        return keccak256(abi.encode(usr, arg, era, val));
     }
 
     // --- executions ---
-    function plan(address usr, bytes memory arg, uint era)
+    function plan(address usr, bytes memory arg, uint era, uint val)
         public
+        payable
         auth
     {
-        require(era > add(block.timestamp, delay), "ds-pause-must-respect-delay")
+        require(era > add(block.timestamp, delay), "ds-pause-must-respect-delay");
+        require(val == msg.value,                  "ds-pause-funds-mismatch");
 
-        bytes32 id  = hash(usr, arg, era);
+        bytes32 id  = hash(usr, arg, era, val);
         planned[id] = true;
 
-        emit Plan(usr, arg, era);
+        emit Plan(usr, arg, era, val);
     }
 
-    function drop(address usr, bytes memory arg, uint era)
+    function drop(address usr, bytes memory arg, uint era, uint val)
         public
         auth
     {
-        bytes32 id  = hash(usr, arg, era);
+        bytes32 id  = hash(usr, arg, era, val);
         planned[id] = false;
 
         emit Drop(usr, arg, era);
     }
 
-    function exec(address usr, bytes memory arg, uint era)
+    function exec(address usr, bytes memory arg, uint era, uint val)
         public
         returns (bytes memory)
     {
-        bytes32 id = hash(usr, arg, era);
+        bytes32 id = hash(usr, arg, era, val);
 
         require(planned[id] == true,    "ds-pause-unplanned-execution");
         require(block.timestamp >= era, "ds-pause-execution-too-soon");
 
         planned[id] = false;
 
-        (bool ok, bytes memory res) = usr.delegatecall(arg);
+        (bool ok, bytes memory res) = usr.delegatecall.value(val)(arg);
         require(ok, "ds-pause-delegatecall-failed");
 
-        emit Exec(usr, arg, era);
+        emit Exec(usr, arg, era, val);
         return res;
     }
 }

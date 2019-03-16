@@ -27,8 +27,9 @@ can only be called by the pause itself. This means that they can only be called 
 
 **`exec(address usr, bytes memory fax, uint256 era) returns (bytes memory response)`**
 
-- `delegatecall`'s into `usr` with calldata `fax` as long as the same call was already planned and
-  the delay period has elapsed
+- `delegatecall`'s into `usr` with `fax` calldata
+- will fail if the call has not be planned beforehand
+- will fail if the delay period has not passed
 - Returns the `delegatecall` output
 
 ## Tests

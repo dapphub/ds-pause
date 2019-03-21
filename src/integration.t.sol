@@ -83,7 +83,7 @@ contract Proposal {
 
     DSPause pause;
     address action;
-    bytes payload;
+    bytes   payload;
 
     constructor(DSPause pause_, address action_, bytes memory payload_) public {
         pause = pause_;
@@ -95,7 +95,9 @@ contract Proposal {
         require(!done);
         done = true;
 
-        return pause.plan(action, payload);
+        uint era = now + pause.delay();
+        pause.plan(action, payload, era);
+        return (action, payload, era);
     }
 }
 
@@ -118,7 +120,7 @@ contract Test is DSTest {
     uint votes = 100;
     uint maxSlateSize = 1;
 
-    // gov system
+    // gov token
     DSToken gov;
 
     function setUp() public {
@@ -206,21 +208,19 @@ contract Guard is DSAuthority {
     function canCall(address src, address dst, bytes4 sig) public view returns (bool) {
         require(src == address(this));
         require(dst == address(pause));
-        require(sig == bytes4(keccak256("plan(address,bytes)")));
+        require(sig == bytes4(keccak256("plan(address,bytes,uint256)")));
         return true;
     }
 
     function unlock() public returns (address, bytes memory, uint) {
         require(now >= lockUntil);
 
-        SetAuthority setAuthority = new SetAuthority();
-        return pause.plan(
-            address(setAuthority),
-            abi.encodeWithSignature(
-                "set(address,address)",
-                pause, newAuthority
-            )
-        );
+        address      usr = address(new SetAuthority());
+        bytes memory fax = abi.encodeWithSignature( "set(address,address)", pause, newAuthority);
+        uint         era = now + pause.delay();
+
+        pause.plan(usr, fax, era);
+        return (usr, fax, era);
     }
 }
 
@@ -231,6 +231,8 @@ contract UpgradeChief is Test {
         // create gov system
         DSChief oldChief = chiefFab.newChief(gov, maxSlateSize);
         DSPause pause = new DSPause(delay, address(0x0), oldChief);
+
+        // make pause the only owner of the target
         target.rely(address(pause));
         target.deny(address(this));
 
@@ -238,15 +240,15 @@ contract UpgradeChief is Test {
         DSChief newChief = chiefFab.newChief(gov, maxSlateSize);
 
         // create guard
-        uint lockGuardUntil = now + 1000;
+        uint lockGuardUntil = now + pause.delay() + 100 days;
         Guard guard = new Guard(lockGuardUntil, pause, address(newChief));
 
-        // create gov proposal to transfer ownership from oldScheduler to guard
-        SetAuthority setAuthority = new SetAuthority();
-        bytes memory payload = abi.encodeWithSignature("set(address,address)", pause, guard);
-        Proposal proposal = new Proposal(pause, address(setAuthority), payload);
+        // create gov proposal to transfer ownership from the old chief to the guard
+        address      usr = address(new SetAuthority());
+        bytes memory fax = abi.encodeWithSignature("set(address,address)", pause, guard);
+        Proposal proposal = new Proposal(pause, usr, fax);
 
-        // check that the oldChief is the authority
+        // check that the old chief is the authority
         assertEq(address(pause.authority()), address(oldChief));
 
         // vote for proposal
@@ -254,13 +256,14 @@ contract UpgradeChief is Test {
         voter.vote(oldChief, address(proposal));
         voter.lift(oldChief, address(proposal));
 
-        // plan ownership transfer from oldBridge to guard
-        (address usr, bytes memory fax, uint era) = proposal.plan();
+        // plan ownership transfer from old chief to guard
+        uint era;
+        (usr, fax, era) = proposal.plan();
 
         // wait until delay is passed
-        hevm.warp(now + delay);
+        hevm.warp(era);
 
-        // execute ownership transfer from oldBridge to guard
+        // execute ownership transfer from old chief to guard
         pause.exec(usr, fax, era);
 
         // check that the guard is the authority
@@ -277,7 +280,7 @@ contract UpgradeChief is Test {
         (usr, fax, era) = guard.unlock();
 
         // wait until delay has passed
-        hevm.warp(now + delay);
+        hevm.warp(era);
 
         // execute ownership transfer from guard to newChief
         pause.exec(usr, fax, era);

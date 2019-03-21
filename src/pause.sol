@@ -61,16 +61,16 @@ contract DSPause is DSAuth {
     }
 
     // --- executions ---
-    function plan(address usr, bytes memory fax)
+    function plan(address usr, bytes memory fax, uint era)
         public
         auth
-        returns (address, bytes memory, uint)
     {
-        bytes32 id  = hash(usr, fax, now);
+        require(era >= add(now, delay), "ds-pause-delay-not-respected");
+
+        bytes32 id  = hash(usr, fax, era);
         planned[id] = true;
 
-        emit Plan(usr, fax, now);
-        return (usr, fax, now);
+        emit Plan(usr, fax, era);
     }
 
     function drop(address usr, bytes memory fax, uint era)
@@ -89,8 +89,8 @@ contract DSPause is DSAuth {
     {
         bytes32 id = hash(usr, fax, era);
 
-        require(now >= add(era, delay), "ds-pause-delay-not-elapsed");
-        require(planned[id] == true,    "ds-pause-unplanned-execution");
+        require(now >= era,          "ds-pause-execution-too-soon");
+        require(planned[id] == true, "ds-pause-unplanned-execution");
 
         planned[id] = false;
 

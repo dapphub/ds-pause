@@ -40,7 +40,7 @@ contract DSPause is DSAuth {
     event Exec(address usr, bytes fax, uint era);
 
     // --- data ---
-    mapping (bytes32 => bool) public planned;
+    mapping (bytes32 => bool) public plans;
     uint public delay;
 
     // --- init ---
@@ -53,8 +53,7 @@ contract DSPause is DSAuth {
 
     // --- util ---
     function hash(address usr, bytes memory fax, uint era)
-        internal
-        pure
+        internal pure
         returns (bytes32)
     {
         return keccak256(abi.encode(usr, fax, era));
@@ -62,24 +61,17 @@ contract DSPause is DSAuth {
 
     // --- executions ---
     function plan(address usr, bytes memory fax, uint era)
-        public
-        auth
+        public auth
     {
         require(era >= add(now, delay), "ds-pause-delay-not-respected");
-
-        bytes32 id  = hash(usr, fax, era);
-        planned[id] = true;
-
+        plans[hash(usr, fax, era)] = true;
         emit Plan(usr, fax, era);
     }
 
     function drop(address usr, bytes memory fax, uint era)
-        public
-        auth
+        public auth
     {
-        bytes32 id  = hash(usr, fax, era);
-        planned[id] = false;
-
+        plans[hash(usr, fax, era)] = false;
         emit Drop(usr, fax, era);
     }
 
@@ -87,12 +79,10 @@ contract DSPause is DSAuth {
         public
         returns (bytes memory response)
     {
-        bytes32 id = hash(usr, fax, era);
+        require(now >= era,                 "ds-pause-execution-too-soon");
+        require(plans[hash(usr, fax, era)], "ds-pause-unplanned-execution");
 
-        require(now >= era,          "ds-pause-execution-too-soon");
-        require(planned[id] == true, "ds-pause-unplanned-execution");
-
-        planned[id] = false;
+        plans[hash(usr, fax, era)] = false;
 
         // delegatecall implementation from ds-proxy
         assembly {

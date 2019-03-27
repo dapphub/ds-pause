@@ -33,6 +33,9 @@ contract GasMeterFactory {
     ---
     0x5a GAS
     0x60 PUSH1
+    0x02 2
+    0x01 ADD
+    0x60 PUSH1
     0x00 0
     0x52 MSTORE
     0x60 PUSH1
@@ -43,8 +46,11 @@ contract GasMeterFactory {
 
     Initcode:
     ---
-    0x68 PUSH9
+    0x68 PUSH12
     0x5a
+    0x60
+    0x02
+    0x01
     0x60
     0x00
     0x52
@@ -59,14 +65,14 @@ contract GasMeterFactory {
     0x60 PUSH1
     0x20 32
     0x60 PUSH1
-    0x17 17
+    0x14 20
     0xf3 RETURN
     */
 
     function build() public returns (address out) {
       assembly {
-        mstore(mload(0x40), 0x685a60005260206000f360005260206017f3)
-        out := create(0, add(14, mload(0x40)), 18)
+        mstore(mload(0x40), 0x685a60020160005260206000f360005260206014f3)
+        out := create(0, add(11, mload(0x40)), 21)
       }
     }
 }

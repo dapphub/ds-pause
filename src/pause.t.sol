@@ -59,14 +59,14 @@ contract GasMeterFactory {
     0x60 PUSH1
     0x20 32
     0x60 PUSH1
-    0x00 0
+    0x17 17
     0xf3 RETURN
     */
 
     function build() public returns (address out) {
       assembly {
-        mstore(mload(0x40), 0x685a60005260206000f360005260206000f3)
-        out := create(0, mload(0x40), 18)
+        mstore(mload(0x40), 0x685a60005260206000f360005260206017f3)
+        out := create(0, add(14, mload(0x40)), 18)
       }
     }
 }

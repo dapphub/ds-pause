@@ -16,21 +16,22 @@ can only be called by the pause itself. This means that they can only be called 
 
 - Initializes a new instance of the contract with a delay in ms
 
-**`plan(address usr, bytes memory fax uint era) public auth`**
+**`plan(address usr, bytes memory fax, uint val, uint era) public auth`**
 
-- Plan a call to address `usr` with `fax` calldata that cannot be executed until `block.timestamp >=
-  era`
+- Plan a call to address `usr` with `fax` calldata and `val` value that cannot be executed until
+  `block.timestamp >= era`
 - Fails if `block.timestamp + delay > era`
 - Returns all data needed to execute or cancel the scheduled call
 
-**`drop(address usr, bytes memory fax, uint era) public auth`**
+**`drop(address usr, bytes memory fax, uint val, uint era) public auth`**
 
 - Cancels a planned execution
 
-**`exec(address usr, bytes memory fax, uint era) public returns (bytes memory response)`**
+**`exec(address usr, bytes memory fax, uint val, uint era) public returns (bytes memory response)`**
 
 - `delegatecall` into `usr` with `fax` calldata
 - Fails if the call has not been planned beforehand
+- Fails if `msg.value` does not match `val`
 - Fails if `era > block.timestamp`
 - Returns the `delegatecall` output
 

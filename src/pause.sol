@@ -35,9 +35,9 @@ contract DSPause is DSAuth {
     }
 
     // --- logs ---
-    event Plan(address usr, bytes fax, uint val, uint gas, uint era);
-    event Drop(address usr, bytes fax, uint val, uint gas, uint era);
-    event Exec(address usr, bytes fax, uint val, uint gas, uint era);
+    event Plan(address usr, bytes fax, uint val, uint era);
+    event Drop(address usr, bytes fax, uint val, uint era);
+    event Exec(address usr, bytes fax, uint val, uint era);
 
     // --- data ---
     uint public delay;
@@ -51,48 +51,43 @@ contract DSPause is DSAuth {
     }
 
     // --- util ---
-    function hash(address usr, bytes memory fax, uint val, uint gas, uint era)
+    function hash(address usr, bytes memory fax, uint val, uint era)
         internal pure
         returns (bytes32)
     {
-        return keccak256(abi.encode(usr, fax, val, gas, era));
+        return keccak256(abi.encode(usr, fax, val, era));
     }
 
     // --- planning ---
-    function plan(address usr, bytes memory fax, uint val, uint gas, uint era)
+    function plan(address usr, bytes memory fax, uint val, uint era)
         public auth
     {
         require(era >= add(now, delay), "ds-pause-plan-too-soon");
-        plans[hash(usr, fax, val, gas, era)] = true;
-        emit Plan(usr, fax, val, gas, era);
+        plans[hash(usr, fax, val, era)] = true;
+        emit Plan(usr, fax, val, era);
     }
 
-    function drop(address usr, bytes memory fax, uint val, uint gas, uint era)
+    function drop(address usr, bytes memory fax, uint val, uint era)
         public auth
     {
-        plans[hash(usr, fax, val, gas, era)] = false;
-        emit Drop(usr, fax, val, gas, era);
+        plans[hash(usr, fax, val, era)] = false;
+        emit Drop(usr, fax, val, era);
     }
 
     // --- execution ---
-    function exec(address usr, bytes memory fax, uint val, uint sag, uint era)
+    function exec(address usr, bytes memory fax, uint val, uint era)
         public payable
         returns (bytes memory response)
     {
-        // A CALL or CREATE can consume at most 63/64 of the gas remaining at
-        // the time the CALL is made; if a CALL asks for more than this
-        // prescribed maximum, then the inner call will only have the
-        // prescribed maximum gas regardless of how much gas was asked for.
-        require(plans[hash(usr, fax, val, sag, era)], "ds-pause-unplanned-exec");
-        //require(gasleft() > add((64 / 63) * sag, 5000),   "ds-pause-not-enough-gas");
-        require(msg.value == val,                     "ds-pause-value-mismatch");
-        require(now >= era,                           "ds-pause-premature-exec");
+        require(plans[hash(usr, fax, val, era)], "ds-pause-unplanned-exec");
+        require(msg.value == val,                "ds-pause-value-mismatch");
+        require(now >= era,                      "ds-pause-premature-exec");
 
-        plans[hash(usr, fax, val, sag, era)] = false;
+        plans[hash(usr, fax, val, era)] = false;
 
         // delegatecall implementation from ds-proxy
         assembly {
-            let succeeded := delegatecall(sag, usr, add(fax, 0x20), mload(fax), 0, 0)
+            let succeeded := delegatecall(sub(gas, 5000), usr, add(fax, 0x20), mload(fax), 0, 0)
             let size := returndatasize
 
             response := mload(0x40)
@@ -106,6 +101,6 @@ contract DSPause is DSAuth {
             }
         }
 
-        emit Exec(usr, fax, val, sag, era);
+        emit Exec(usr, fax, val, era);
     }
 }

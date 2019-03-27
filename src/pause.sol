@@ -20,11 +20,11 @@ import "ds-auth/auth.sol";
 contract DSPause is DSAuth {
     // --- auth ---
     function setOwner(address owner_) public {
-        require(msg.sender == address(this), "ds-pause-undelayed-ownership-change");
+        require(msg.sender == address(this), "ds-pause-unplanned-ownership-change");
         super.setOwner(owner_);
     }
     function setAuthority(DSAuthority authority_) public {
-        require(msg.sender == address(this), "ds-pause-undelayed-authority-change");
+        require(msg.sender == address(this), "ds-delay-unplanned-authority-change");
         super.setAuthority(authority_);
     }
 
@@ -35,13 +35,13 @@ contract DSPause is DSAuth {
     }
 
     // --- logs ---
-    event Plan(address usr, bytes fax, uint era);
-    event Drop(address usr, bytes fax, uint era);
-    event Exec(address usr, bytes fax, uint era);
+    event Plan(address usr, bytes fax, uint val, uint gas, uint era);
+    event Drop(address usr, bytes fax, uint val, uint gas, uint era);
+    event Exec(address usr, bytes fax, uint val, uint gas, uint era);
 
     // --- data ---
-    mapping (bytes32 => bool) public plans;
     uint public delay;
+    mapping (bytes32 => bool) public plans;
 
     // --- init ---
     constructor(uint delay_, address owner_, DSAuthority authority_) public {
@@ -50,43 +50,49 @@ contract DSPause is DSAuth {
         authority = authority_;
     }
 
-
     // --- util ---
-    function hash(address usr, bytes memory fax, uint era)
+    function hash(address usr, bytes memory fax, uint val, uint gas, uint era)
         internal pure
         returns (bytes32)
     {
-        return keccak256(abi.encode(usr, fax, era));
+        return keccak256(abi.encode(usr, fax, val, gas, era));
     }
 
-    // --- executions ---
-    function plan(address usr, bytes memory fax, uint era)
+    // --- planning ---
+    function plan(address usr, bytes memory fax, uint val, uint gas, uint era)
         public auth
     {
-        require(era >= add(now, delay), "ds-pause-delay-not-respected");
-        plans[hash(usr, fax, era)] = true;
-        emit Plan(usr, fax, era);
+        require(era >= add(now, delay), "ds-pause-plan-too-soon");
+        plans[hash(usr, fax, val, gas, era)] = true;
+        emit Plan(usr, fax, val, gas, era);
     }
 
-    function drop(address usr, bytes memory fax, uint era)
+    function drop(address usr, bytes memory fax, uint val, uint gas, uint era)
         public auth
     {
-        plans[hash(usr, fax, era)] = false;
-        emit Drop(usr, fax, era);
+        plans[hash(usr, fax, val, gas, era)] = false;
+        emit Drop(usr, fax, val, gas, era);
     }
 
-    function exec(address usr, bytes memory fax, uint era)
-        public
+    // --- execution ---
+    function exec(address usr, bytes memory fax, uint val, uint sag, uint era)
+        public payable
         returns (bytes memory response)
     {
-        require(now >= era,                 "ds-pause-execution-too-soon");
-        require(plans[hash(usr, fax, era)], "ds-pause-unplanned-execution");
+        // A CALL or CREATE can consume at most 63/64 of the gas remaining at
+        // the time the CALL is made; if a CALL asks for more than this
+        // prescribed maximum, then the inner call will only have the
+        // prescribed maximum gas regardless of how much gas was asked for.
+        require(plans[hash(usr, fax, val, sag, era)], "ds-pause-unplanned-exec");
+        //require(gasleft() > add((64 / 63) * sag, 5000),   "ds-pause-not-enough-gas");
+        require(msg.value == val,                     "ds-pause-value-mismatch");
+        require(now >= era,                           "ds-pause-premature-exec");
 
-        plans[hash(usr, fax, era)] = false;
+        plans[hash(usr, fax, val, sag, era)] = false;
 
         // delegatecall implementation from ds-proxy
         assembly {
-            let succeeded := delegatecall(sub(gas, 5000), usr, add(fax, 0x20), mload(fax), 0, 0)
+            let succeeded := delegatecall(sag, usr, add(fax, 0x20), mload(fax), 0, 0)
             let size := returndatasize
 
             response := mload(0x40)
@@ -100,6 +106,6 @@ contract DSPause is DSAuth {
             }
         }
 
-        emit Exec(usr, fax, era);
+        emit Exec(usr, fax, val, sag, era);
     }
 }

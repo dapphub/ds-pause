@@ -82,22 +82,26 @@ contract Proposal {
     bool done = false;
 
     DSPause pause;
-    address action;
-    bytes   payload;
+    address usr;
+    bytes   fax;
+    uint    val;
+    uint    gas;
 
-    constructor(DSPause pause_, address action_, bytes memory payload_) public {
+    constructor(DSPause pause_, address usr_, bytes memory fax_, uint val_, uint gas_) public {
         pause = pause_;
-        action = action_;
-        payload = payload_;
+        usr = usr_;
+        fax = fax_;
+        val = val_;
+        gas = gas_;
     }
 
-    function plan() public returns (address, bytes memory, uint) {
+    function plan() public returns (address, bytes memory, uint, uint, uint) {
         require(!done);
         done = true;
 
         uint era = now + pause.delay();
-        pause.plan(action, payload, era);
-        return (action, payload, era);
+        pause.plan(usr, fax, val, gas, era);
+        return (usr, fax, val, gas, era);
     }
 }
 
@@ -162,23 +166,28 @@ contract Voting is Test {
         target.deny(address(this));
 
         // create proposal
-        SimpleAction action = new SimpleAction();
-        Proposal proposal = new Proposal(pause, address(action), abi.encodeWithSignature("exec(address)", target));
+        address      usr = address(new SimpleAction());
+        bytes memory fax = abi.encodeWithSignature("exec(address)", target);
+        uint         val = 0;
+        uint         gas = 500000;
+
+        Proposal proposal = new Proposal(pause, usr, fax, val, gas);
 
         // make proposal the hat
         voter.lock(chief, votes);
         voter.vote(chief, address(proposal));
         voter.lift(chief, address(proposal));
 
-        // execute proposal (plan action)
-        (address usr, bytes memory fax, uint era) = proposal.plan();
+        // make plan
+        uint era;
+        (usr, fax, val, gas, era) = proposal.plan();
 
         // wait until delay is passed
-        hevm.warp(now + delay);
+        hevm.warp(era);
 
-        // execute action
+        // execute plan
         assertEq(target.val(), 0);
-        pause.exec(usr, fax, era);
+        pause.exec(usr, fax, val, gas, era);
         assertEq(target.val(), 1);
     }
 
@@ -208,19 +217,21 @@ contract Guard is DSAuthority {
     function canCall(address src, address dst, bytes4 sig) public view returns (bool) {
         require(src == address(this));
         require(dst == address(pause));
-        require(sig == bytes4(keccak256("plan(address,bytes,uint256)")));
+        require(sig == bytes4(keccak256("plan(address,bytes,uint256,uint256,uint256)")));
         return true;
     }
 
-    function unlock() public returns (address, bytes memory, uint) {
+    function unlock() public returns (address, bytes memory, uint, uint, uint) {
         require(now >= lockUntil);
 
         address      usr = address(new SetAuthority());
         bytes memory fax = abi.encodeWithSignature( "set(address,address)", pause, newAuthority);
+        uint         val = 0;
+        uint         gas = 500000;
         uint         era = now + pause.delay();
 
-        pause.plan(usr, fax, era);
-        return (usr, fax, era);
+        pause.plan(usr, fax, val, gas, era);
+        return (usr, fax, val, gas, era);
     }
 }
 
@@ -243,10 +254,13 @@ contract UpgradeChief is Test {
         uint lockGuardUntil = now + pause.delay() + 100 days;
         Guard guard = new Guard(lockGuardUntil, pause, address(newChief));
 
-        // create gov proposal to transfer ownership from the old chief to the guard
+        // create proposal to transfer ownership from the old chief to the guard
         address      usr = address(new SetAuthority());
         bytes memory fax = abi.encodeWithSignature("set(address,address)", pause, guard);
-        Proposal proposal = new Proposal(pause, usr, fax);
+        uint         val = 0;
+        uint         gas = 500000;
+
+        Proposal proposal = new Proposal(pause, usr, fax, val, gas);
 
         // check that the old chief is the authority
         assertEq(address(pause.authority()), address(oldChief));
@@ -258,13 +272,13 @@ contract UpgradeChief is Test {
 
         // plan ownership transfer from old chief to guard
         uint era;
-        (usr, fax, era) = proposal.plan();
+        (usr, fax, val, gas, era) = proposal.plan();
 
         // wait until delay is passed
         hevm.warp(era);
 
         // execute ownership transfer from old chief to guard
-        pause.exec(usr, fax, era);
+        pause.exec(usr, fax, val, gas, era);
 
         // check that the guard is the authority
         assertEq(address(pause.authority()), address(guard));
@@ -277,13 +291,13 @@ contract UpgradeChief is Test {
         hevm.warp(lockGuardUntil);
 
         // plan ownership transfer from guard to newChief
-        (usr, fax, era) = guard.unlock();
+        (usr, fax, val, gas, era) = guard.unlock();
 
         // wait until delay has passed
         hevm.warp(era);
 
         // execute ownership transfer from guard to newChief
-        pause.exec(usr, fax, era);
+        pause.exec(usr, fax, val, gas, era);
 
         // check that the new chief is the authority
         assertEq(address(pause.authority()), address(newChief));

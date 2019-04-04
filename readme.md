@@ -49,6 +49,18 @@ Plans can be manipulated in the following ways:
 **storage**
 - Auth can only be changed if an authorized user plots a `plan` to do so
 - The `delay` can only be changed if an authorized user plots a `plan` to do so
+- Storage can only be modified through use of the publicly exposed methods
+- The pause will always retain ownership of it's `proxy`
+
+## Identity & Trust
+
+In order to protect the internal storage of the pause from malicious writes during `plan` execution,
+we perform the actual `delegatecall` operation in a seperate contract with an isolated storage
+context (`DSPauseProxy`). Each pause has it's own individual `proxy`.
+
+This means that `plan`'s are executed with the identity of the `proxy`, and when integrating the
+pause into some auth scheme, you probably want to trust the pause's `proxy` and not the pause
+itself.
 
 ## Example Usage
 
@@ -81,3 +93,4 @@ bytes memory out = pause.exec(usr, fax, eta);
 
 - [`pause.t.sol`](./pause.t.sol): unit tests
 - [`integration.t.sol`](./integration.t.sol): usage examples / integation tests
+

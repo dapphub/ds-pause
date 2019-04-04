@@ -21,12 +21,14 @@ import "ds-note/note.sol";
 contract DSPause is DSAuth, DSNote {
     // --- auth ---
     function setOwner(address owner_) public {
-        require(msg.sender == address(this), "ds-pause-undelayed-ownership-change");
-        super.setOwner(owner_);
+        require(msg.sender == address(proxy), "ds-pause-undelayed-ownership-change");
+        owner = owner_;
+        emit LogSetOwner(owner);
     }
     function setAuthority(DSAuthority authority_) public {
-        require(msg.sender == address(this), "ds-pause-undelayed-authority-change");
-        super.setAuthority(authority_);
+        require(msg.sender == address(proxy), "ds-pause-undelayed-authority-change");
+        authority = authority_;
+        emit LogSetAuthority(address(authority));
     }
 
     // --- math ---
@@ -37,13 +39,15 @@ contract DSPause is DSAuth, DSNote {
 
     // --- data ---
     mapping (bytes32 => bool) public plans;
-    uint public delay;
+    DSPauseProxy public proxy;
+    uint         public delay;
 
     // --- init ---
     constructor(uint delay_, address owner_, DSAuthority authority_) public {
         delay = delay_;
         owner = owner_;
         authority = authority_;
+        proxy = new DSPauseProxy(address(this));
     }
 
     // --- util ---
@@ -70,12 +74,31 @@ contract DSPause is DSAuth, DSNote {
 
     function exec(address usr, bytes memory fax, uint eta)
         public note
-        returns (bytes memory response)
+        returns (bytes memory out)
     {
         require(now >= eta,                 "ds-pause-premature-execution");
         require(plans[hash(usr, fax, eta)], "ds-pause-unplotted-execution");
 
         plans[hash(usr, fax, eta)] = false;
+
+        out = proxy.exec(usr, fax);
+        require(proxy.owner() == address(this), "ds-pause-illegal-storage-change");
+    }
+}
+
+// plans are executed in an isolated storage context to protect the storage on
+// the pause from malicious plans
+contract DSPauseProxy {
+    address public owner;
+    constructor(address owner_) public {
+        owner = owner_;
+    }
+
+    function exec(address usr, bytes memory fax)
+        public
+        returns (bytes memory response)
+    {
+        require(msg.sender == owner, "ds-pause-proxy-unauthorized");
 
         // delegatecall implementation from ds-proxy
         assembly {

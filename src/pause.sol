@@ -21,12 +21,14 @@ import "ds-note/note.sol";
 contract DSPause is DSAuth, DSNote {
     // --- auth ---
     function setOwner(address owner_) public {
-        require(msg.sender == address(this), "ds-pause-undelayed-ownership-change");
-        super.setOwner(owner_);
+        require(msg.sender == address(delegator), "ds-pause-undelayed-ownership-change");
+        owner = owner_;
+        emit LogSetOwner(owner);
     }
     function setAuthority(DSAuthority authority_) public {
-        require(msg.sender == address(this), "ds-pause-undelayed-authority-change");
-        super.setAuthority(authority_);
+        require(msg.sender == address(delegator), "ds-pause-undelayed-authority-change");
+        authority = authority_;
+        emit LogSetAuthority(address(authority));
     }
 
     // --- math ---
@@ -37,6 +39,7 @@ contract DSPause is DSAuth, DSNote {
 
     // --- data ---
     mapping (bytes32 => bool) public plans;
+    Delegator public delegator;
     uint public delay;
 
     // --- init ---
@@ -44,6 +47,7 @@ contract DSPause is DSAuth, DSNote {
         delay = delay_;
         owner = owner_;
         authority = authority_;
+        delegator = new Delegator(address(this));
     }
 
     // --- util ---
@@ -70,12 +74,29 @@ contract DSPause is DSAuth, DSNote {
 
     function exec(address usr, bytes memory fax, uint eta)
         public note
-        returns (bytes memory response)
+        returns (bytes memory out)
     {
         require(now >= eta,                 "ds-pause-premature-execution");
         require(plans[hash(usr, fax, eta)], "ds-pause-unplanned-execution");
 
         plans[hash(usr, fax, eta)] = false;
+
+        out = delegator.exec(usr, fax);
+        require(delegator.owner() == address(this), "ds-pause-illegal-storage-change");
+    }
+}
+
+contract Delegator {
+    address public owner;
+    constructor(address owner_) public {
+        owner = owner_;
+    }
+
+    function exec(address usr, bytes memory fax)
+        public payable
+        returns (bytes memory response)
+    {
+        require(msg.sender == owner, "ds-pause-delegator-unauthorized");
 
         // delegatecall implementation from ds-proxy
         assembly {

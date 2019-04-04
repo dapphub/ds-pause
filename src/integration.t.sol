@@ -158,7 +158,7 @@ contract Voting is Test {
         // create gov system
         DSChief chief = chiefFab.newChief(gov, maxSlateSize);
         DSPause pause = new DSPause(delay, address(0x0), chief);
-        target.rely(address(pause));
+        target.rely(address(pause.delegator()));
         target.deny(address(this));
 
         // create proposal
@@ -233,7 +233,7 @@ contract UpgradeChief is Test {
         DSPause pause = new DSPause(delay, address(0x0), oldChief);
 
         // make pause the only owner of the target
-        target.rely(address(pause));
+        target.rely(address(pause.delegator()));
         target.deny(address(this));
 
         // create new chief

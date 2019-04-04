@@ -28,6 +28,11 @@ contract Hevm {
 }
 
 contract Target {
+    address owner;
+    function give(address usr) public {
+        owner = usr;
+    }
+
     function get() public pure returns (bytes32) {
         return bytes32("Hello");
     }
@@ -206,6 +211,16 @@ contract Exec is Test {
         pause.plot(usr, fax, eta);
         hevm.warp(eta);
         pause.exec(usr, fax, eta);
+        pause.exec(usr, fax, eta);
+    }
+
+    function testFail_exec_plan_with_proxy_ownership_change() public {
+        address      usr = target;
+        bytes memory fax = abi.encodeWithSignature("give(address)", address(this));
+        uint         eta = now + pause.delay();
+
+        pause.plot(usr, fax, eta);
+        hevm.warp(eta);
         pause.exec(usr, fax, eta);
     }
 

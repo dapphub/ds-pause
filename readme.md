@@ -1,8 +1,20 @@
 # DSPause
 
-_schedule function calls that can only be executed after some predetermined delay has passed_
+_enforce a delay on code execution to give affected parties time to react_
 
-This can be useful as a security component within a governance system, to ensure that those affected by governance decisions have time to react in the case of an attack.
+`ds-pause` allows authorized entities to make `plans`. A `plan` describes a single `delegatecall`
+operation and a unix timestamp `era` before which it cannot be executed.
+
+Once `era` has passed, a `plan` can be executed by anyone.
+
+A `plan` can only be made if it's `era` is after `block.timestamp + delay`. The `delay` is
+configurable upon construction.
+
+A `plan` consists of:
+
+- `usr`: the address to `delegatecall` into
+- `fax`: the `calldata` to use
+- `era`: the time before which the `plan` cannot be executed
 
 ## Auth
 

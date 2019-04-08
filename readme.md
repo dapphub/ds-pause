@@ -3,18 +3,18 @@
 _enforce a delay on code execution to give affected parties time to react_
 
 `ds-pause` allows authorized entities to make `plans`. A `plan` describes a single `delegatecall`
-operation and a unix timestamp `era` before which it cannot be executed.
+operation and a unix timestamp `eta` before which it cannot be executed.
 
-Once `era` has passed, a `plan` can be executed by anyone.
+Once `eta` has passed, a `plan` can be executed by anyone.
 
-A `plan` can only be made if it's `era` is after `block.timestamp + delay`. The `delay` is
+A `plan` can only be made if its `eta` is after `block.timestamp + delay`. The `delay` is
 configurable upon construction.
 
 A `plan` consists of:
 
 - `usr`: the address to `delegatecall` into
 - `fax`: the `calldata` to use
-- `era`: the time before which the `plan` cannot be executed
+- `eta`: the time from when the `plan` can be executed
 
 ## Auth
 
@@ -28,22 +28,22 @@ can only be called by the pause itself. This means that they can only be called 
 
 - Initializes a new instance of the contract with a delay in ms
 
-**`plan(address usr, bytes memory fax uint era) public auth`**
+**`plan(address usr, bytes memory fax uint eta) public auth`**
 
 - Plan a call to address `usr` with `fax` calldata that cannot be executed until `block.timestamp >=
-  era`
-- Fails if `block.timestamp + delay > era`
+  eta`
+- Fails if `block.timestamp + delay > eta`
 - Returns all data needed to execute or cancel the scheduled call
 
-**`drop(address usr, bytes memory fax, uint era) public auth`**
+**`drop(address usr, bytes memory fax, uint eta) public auth`**
 
 - Cancels a planned execution
 
-**`exec(address usr, bytes memory fax, uint era) public returns (bytes memory response)`**
+**`exec(address usr, bytes memory fax, uint eta) public returns (bytes memory response)`**
 
 - `delegatecall` into `usr` with `fax` calldata
 - Fails if the call has not been planned beforehand
-- Fails if `era > block.timestamp`
+- Fails if `eta > block.timestamp`
 - Returns the `delegatecall` output
 
 ## Tests

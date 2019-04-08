@@ -34,14 +34,14 @@ contract Target {
 }
 
 contract Stranger {
-    function plan(DSPause pause, address usr, bytes memory fax, uint era) public {
-        pause.plan(usr, fax, era);
+    function plan(DSPause pause, address usr, bytes memory fax, uint eta) public {
+        pause.plan(usr, fax, eta);
     }
-    function drop(DSPause pause, address usr, bytes memory fax, uint era) public {
-        pause.drop(usr, fax, era);
+    function drop(DSPause pause, address usr, bytes memory fax, uint eta) public {
+        pause.drop(usr, fax, eta);
     }
-    function exec(DSPause pause, address usr, bytes memory fax, uint era) public returns (bytes memory) {
-        return pause.exec(usr, fax, era);
+    function exec(DSPause pause, address usr, bytes memory fax, uint eta) public returns (bytes memory) {
+        return pause.exec(usr, fax, eta);
     }
 }
 
@@ -136,11 +136,11 @@ contract Auth is Test {
     function test_set_owner_with_delay() public {
         address      usr = address(new SetOwner());
         bytes memory fax = abi.encodeWithSignature("set(address,address)", pause, 0xdeadbeef);
-        uint         era = now + pause.delay();
+        uint         eta = now + pause.delay();
 
-        pause.plan(usr, fax, era);
-        hevm.warp(era);
-        pause.exec(usr, fax, era);
+        pause.plan(usr, fax, eta);
+        hevm.warp(eta);
+        pause.exec(usr, fax, eta);
 
         assertEq(address(pause.owner()), address(0xdeadbeef));
     }
@@ -154,11 +154,11 @@ contract Auth is Test {
 
         address      usr = address(new SetAuthority());
         bytes memory fax = abi.encodeWithSignature("set(address,address)", pause, newAuthority);
-        uint         era = now + pause.delay();
+        uint         eta = now + pause.delay();
 
-        pause.plan(usr, fax, era);
-        hevm.warp(era);
-        pause.exec(usr, fax, era);
+        pause.plan(usr, fax, eta);
+        hevm.warp(eta);
+        pause.exec(usr, fax, eta);
 
         assertEq(address(pause.authority()), address(newAuthority));
     }
@@ -169,19 +169,19 @@ contract Plan is Test {
     function testFail_call_from_unauthorized() public {
         address      usr = target;
         bytes memory fax = abi.encodeWithSignature("get()");
-        uint         era = now + pause.delay();
+        uint         eta = now + pause.delay();
 
-        stranger.plan(pause, usr, fax, era);
+        stranger.plan(pause, usr, fax, eta);
     }
 
     function test_plan() public {
         address      usr = target;
         bytes memory fax = abi.encodeWithSignature("get()");
-        uint         era = now + pause.delay();
+        uint         eta = now + pause.delay();
 
-        pause.plan(usr, fax, era);
+        pause.plan(usr, fax, eta);
 
-        bytes32 id = keccak256(abi.encode(usr, fax, era));
+        bytes32 id = keccak256(abi.encode(usr, fax, eta));
         assertTrue(pause.plans(id));
     }
 
@@ -192,31 +192,31 @@ contract Exec is Test {
     function testFail_delay_not_passed() public {
         address      usr = target;
         bytes memory fax = abi.encode(0);
-        uint         era = now + pause.delay();
+        uint         eta = now + pause.delay();
 
-        pause.plan(usr, fax, era);
-        pause.exec(usr, fax, era);
+        pause.plan(usr, fax, eta);
+        pause.exec(usr, fax, eta);
     }
 
     function testFail_double_execution() public {
         address      usr = target;
         bytes memory fax = abi.encodeWithSignature("get()");
-        uint         era = now + pause.delay();
+        uint         eta = now + pause.delay();
 
-        pause.plan(usr, fax, era);
-        hevm.warp(era);
-        pause.exec(usr, fax, era);
-        pause.exec(usr, fax, era);
+        pause.plan(usr, fax, eta);
+        hevm.warp(eta);
+        pause.exec(usr, fax, eta);
+        pause.exec(usr, fax, eta);
     }
 
     function test_exec_delay_passed() public {
         address      usr = target;
         bytes memory fax = abi.encodeWithSignature("get()");
-        uint         era = now + pause.delay();
+        uint         eta = now + pause.delay();
 
-        pause.plan(usr, fax, era);
-        hevm.warp(era);
-        bytes memory out = pause.exec(usr, fax, era);
+        pause.plan(usr, fax, eta);
+        hevm.warp(eta);
+        bytes memory out = pause.exec(usr, fax, eta);
 
         assertEq(b32(out), bytes32("Hello"));
     }
@@ -224,12 +224,12 @@ contract Exec is Test {
     function test_call_from_unauthorized() public {
         address      usr = target;
         bytes memory fax = abi.encodeWithSignature("get()");
-        uint         era = now + pause.delay();
+        uint         eta = now + pause.delay();
 
-        pause.plan(usr, fax, era);
-        hevm.warp(era);
+        pause.plan(usr, fax, eta);
+        hevm.warp(eta);
 
-        bytes memory out = stranger.exec(pause, usr, fax, era);
+        bytes memory out = stranger.exec(pause, usr, fax, eta);
 
         assertEq(b32(out), bytes32("Hello"));
     }
@@ -241,25 +241,25 @@ contract Drop is Test {
     function testFail_call_from_unauthorized() public {
         address      usr = target;
         bytes memory fax = abi.encodeWithSignature("get()");
-        uint         era = now + pause.delay();
+        uint         eta = now + pause.delay();
 
-        pause.plan(usr, fax, era);
-        hevm.warp(era);
+        pause.plan(usr, fax, eta);
+        hevm.warp(eta);
 
-        stranger.drop(pause, usr, fax, era);
+        stranger.drop(pause, usr, fax, eta);
     }
 
     function test_drop_planned_execution() public {
         address      usr = target;
         bytes memory fax = abi.encodeWithSignature("get()");
-        uint         era = now + pause.delay();
+        uint         eta = now + pause.delay();
 
-        pause.plan(usr, fax, era);
+        pause.plan(usr, fax, eta);
 
-        hevm.warp(era);
-        pause.drop(usr, fax, era);
+        hevm.warp(eta);
+        pause.drop(usr, fax, eta);
 
-        bytes32 id = keccak256(abi.encode(usr, fax, era));
+        bytes32 id = keccak256(abi.encode(usr, fax, eta));
         assertTrue(!pause.plans(id));
     }
 

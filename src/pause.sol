@@ -35,9 +35,9 @@ contract DSPause is DSAuth {
     }
 
     // --- logs ---
-    event Plan(address usr, bytes fax, uint era);
-    event Drop(address usr, bytes fax, uint era);
-    event Exec(address usr, bytes fax, uint era);
+    event Plan(address usr, bytes fax, uint eta);
+    event Drop(address usr, bytes fax, uint eta);
+    event Exec(address usr, bytes fax, uint eta);
 
     // --- data ---
     mapping (bytes32 => bool) public plans;
@@ -52,37 +52,37 @@ contract DSPause is DSAuth {
 
 
     // --- util ---
-    function hash(address usr, bytes memory fax, uint era)
+    function hash(address usr, bytes memory fax, uint eta)
         internal pure
         returns (bytes32)
     {
-        return keccak256(abi.encode(usr, fax, era));
+        return keccak256(abi.encode(usr, fax, eta));
     }
 
     // --- executions ---
-    function plan(address usr, bytes memory fax, uint era)
+    function plan(address usr, bytes memory fax, uint eta)
         public auth
     {
-        require(era >= add(now, delay), "ds-pause-delay-not-respected");
-        plans[hash(usr, fax, era)] = true;
-        emit Plan(usr, fax, era);
+        require(eta >= add(now, delay), "ds-pause-delay-not-respected");
+        plans[hash(usr, fax, eta)] = true;
+        emit Plan(usr, fax, eta);
     }
 
-    function drop(address usr, bytes memory fax, uint era)
+    function drop(address usr, bytes memory fax, uint eta)
         public auth
     {
-        plans[hash(usr, fax, era)] = false;
-        emit Drop(usr, fax, era);
+        plans[hash(usr, fax, eta)] = false;
+        emit Drop(usr, fax, eta);
     }
 
-    function exec(address usr, bytes memory fax, uint era)
+    function exec(address usr, bytes memory fax, uint eta)
         public
         returns (bytes memory response)
     {
-        require(now >= era,                 "ds-pause-execution-too-soon");
-        require(plans[hash(usr, fax, era)], "ds-pause-unplanned-execution");
+        require(now >= eta,                 "ds-pause-execution-too-soon");
+        require(plans[hash(usr, fax, eta)], "ds-pause-unplanned-execution");
 
-        plans[hash(usr, fax, era)] = false;
+        plans[hash(usr, fax, eta)] = false;
 
         // delegatecall implementation from ds-proxy
         assembly {
@@ -100,6 +100,6 @@ contract DSPause is DSAuth {
             }
         }
 
-        emit Exec(usr, fax, era);
+        emit Exec(usr, fax, eta);
     }
 }

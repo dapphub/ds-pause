@@ -50,7 +50,6 @@ contract DSPause is DSAuth {
         authority = authority_;
     }
 
-
     // --- util ---
     function hash(address usr, bytes memory fax, uint eta)
         internal pure

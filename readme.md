@@ -1,11 +1,17 @@
 # DSPause
 
-_enforce a delay on code execution to give affected parties time to react_
+_`delegatecall` based proxy with an enforced wait time for code execution_
+
+`ds-pause` is designed to be used as a component in a governance system, to ensure that the governed
+have time to respond to malicious actions. This can help to constrain the power wielded by the
+governors.
+
+## Plans
 
 `ds-pause` allows authorized entities to make `plans`. A `plan` describes a single `delegatecall`
 operation and a unix timestamp `eta` before which it cannot be executed.
 
-Once `eta` has passed, a `plan` can be executed by anyone.
+Once the `eta` has passed, a `plan` can be executed by anyone.
 
 A `plan` can only be made if its `eta` is after `block.timestamp + delay`. The `delay` is
 configurable upon construction.
@@ -18,9 +24,10 @@ A `plan` consists of:
 
 ## Auth
 
-`ds-pause` uses a slightly modified form of the `ds-auth` scheme. Both `setOwner` and `setAuthority`
-can only be called by the pause itself. This means that they can only be called by using `schedule` /
-`execute` on the pause, and changes to auth are therefore also subject to a delay.
+`ds-pause` uses a slightly modified form of the [`ds-auth`](https://github.com/dapphub/ds-auth)
+scheme. Changes to auth are potentially highly impactful, and must also be subject to a delay.
+
+`owner` and `authority` can therefore only be changed if an authorized user makes a `plan` to do so.
 
 ## Interface
 

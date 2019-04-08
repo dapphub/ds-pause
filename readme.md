@@ -7,14 +7,14 @@ operation and a unix timestamp `eta` before which it cannot be executed.
 
 Once `eta` has passed, a `plan` can be executed by anyone.
 
-A `plan` can only be made if it's `eta` is after `block.timestamp + delay`. The `delay` is
+A `plan` can only be made if its `eta` is after `block.timestamp + delay`. The `delay` is
 configurable upon construction.
 
 A `plan` consists of:
 
 - `usr`: the address to `delegatecall` into
 - `fax`: the `calldata` to use
-- `eta`: the time before which the `plan` cannot be executed
+- `eta`: the time from when the `plan` can be executed
 
 ## Auth
 

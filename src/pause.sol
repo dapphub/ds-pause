@@ -78,7 +78,7 @@ contract DSPause is DSAuth {
         public
         returns (bytes memory response)
     {
-        require(now >= eta,                 "ds-pause-execution-too-soon");
+        require(now >= eta,                 "ds-pause-premature-execution");
         require(plans[hash(usr, fax, eta)], "ds-pause-unplanned-execution");
 
         plans[hash(usr, fax, eta)] = false;

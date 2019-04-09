@@ -15,39 +15,26 @@
 
 pragma solidity >=0.5.0 <0.6.0;
 
-import "ds-auth/auth.sol";
 import "ds-note/note.sol";
 
-contract DSPause is DSAuth, DSNote {
+contract DSPause is DSNote {
     // --- auth ---
-    function setOwner(address owner_) public {
-        require(msg.sender == address(delegator), "ds-pause-undelayed-ownership-change");
-        owner = owner_;
-        emit LogSetOwner(owner);
-    }
-    function setAuthority(DSAuthority authority_) public {
-        require(msg.sender == address(delegator), "ds-pause-undelayed-authority-change");
-        authority = authority_;
-        emit LogSetAuthority(address(authority));
-    }
+    mapping (address => uint) public wards;
+    function rely(address usr) public note rest { wards[usr] = 1; }
+    function deny(address usr) public note rest { wards[usr] = 0; }
 
-    // --- math ---
-    function add(uint x, uint y) internal pure returns (uint z) {
-        z = x + y;
-        require(z >= x, "ds-pause-addition-overflow");
-    }
+    modifier rest { require(msg.sender == cage,     "ds-pause-uncaged-call"); _; }
+    modifier auth { require(wards[msg.sender] == 1, "ds-pause-unauthorized"); _; }
 
     // --- data ---
     mapping (bytes32 => bool) public plans;
-    Delegator public delegator;
-    uint public delay;
+    uint        public wait;
+    DSPauseCage public cage;
 
     // --- init ---
-    constructor(uint delay_, address owner_, DSAuthority authority_) public {
-        delay = delay_;
-        owner = owner_;
-        authority = authority_;
-        delegator = new Delegator(address(this));
+    constructor(uint wait_) public {
+        wait = wait_;
+        cage = new DSPauseCage(address(this));
     }
 
     // --- util ---
@@ -55,6 +42,7 @@ contract DSPause is DSAuth, DSNote {
         internal pure
         returns (bytes32)
     {
+        // is this safe?
         return keccak256(abi.encode(usr, fax, eta));
     }
 
@@ -62,13 +50,14 @@ contract DSPause is DSAuth, DSNote {
     function plan(address usr, bytes memory fax, uint eta)
         public note auth
     {
-        require(eta >= add(now, delay), "ds-pause-delay-not-respected");
+        require(eta >= now + wait,          "ds-pause-plan-too-early");
         plans[hash(usr, fax, eta)] = true;
     }
 
     function drop(address usr, bytes memory fax, uint eta)
         public note auth
     {
+        require(plans[hash(usr, fax, eta)], "ds-pause-unplotted-plan");
         plans[hash(usr, fax, eta)] = false;
     }
 
@@ -76,17 +65,19 @@ contract DSPause is DSAuth, DSNote {
         public note
         returns (bytes memory out)
     {
-        require(now >= eta,                 "ds-pause-premature-execution");
-        require(plans[hash(usr, fax, eta)], "ds-pause-unplanned-execution");
+        require(plans[hash(usr, fax, eta)], "ds-pause-unplotted-plan");
+        require(now >= eta,                 "ds-pause-premature-exec");
 
         plans[hash(usr, fax, eta)] = false;
 
-        out = delegator.exec(usr, fax);
-        require(delegator.owner() == address(this), "ds-pause-illegal-storage-change");
+        out = cage.exec(usr, fax);
+        require(cage.owner() == address(this), "ds-pause-cage-stolen");
     }
 }
 
-contract Delegator {
+// isolated storage context for delegatecall.
+// protects the internal storage of the pause from malicious plans
+contract DSPauseCage {
     address public owner;
     constructor(address owner_) public {
         owner = owner_;
@@ -94,24 +85,12 @@ contract Delegator {
 
     function exec(address usr, bytes memory fax)
         public payable
-        returns (bytes memory response)
+        returns (bytes memory out)
     {
-        require(msg.sender == owner, "ds-pause-delegator-unauthorized");
+        require(msg.sender == owner, "ds-pause-cage-unauthorized");
 
-        // delegatecall implementation from ds-proxy
-        assembly {
-            let succeeded := delegatecall(sub(gas, 5000), usr, add(fax, 0x20), mload(fax), 0, 0)
-            let size := returndatasize
-
-            response := mload(0x40)
-            mstore(0x40, add(response, and(add(add(size, 0x20), 0x1f), not(0x1f))))
-            mstore(response, size)
-            returndatacopy(add(response, 0x20), 0, size)
-
-            switch iszero(succeeded)
-            case 1 {
-                revert(add(response, 0x20), size)
-            }
-        }
+        bool ok;
+        (ok, out) = usr.delegatecall(fax);
+        require(ok, "ds-pause-delegatecall-failed");
     }
 }

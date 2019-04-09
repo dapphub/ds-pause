@@ -1,57 +1,81 @@
-# DSPause
+<h1 align="center">
+ds-pause
+</h1>
 
-_`delegatecall` based proxy with an enforced wait time for code execution_
+<p align="center">
+<i><code>delegatecall</code> based proxy with an enforced delay</i>
+</p>
 
-`ds-pause` is designed to be used as a component in a governance system, to ensure that the governed
-have time to respond to malicious actions. This can help to constrain the power wielded by the
-governors.
+`ds-pause` is designed to be used as a component in a governance system, to give affected parties
+time to respond to decisions. If those affected by governance decisions have e.g. exit or veto
+rights, then the pause can serve as an effective check on governance power.
 
 ## Plans
 
-`ds-pause` allows authorized entities to make `plans`. A `plan` describes a single `delegatecall`
-operation and a unix timestamp `eta` before which it cannot be executed.
-
-Once the `eta` has passed, a `plan` can be executed by anyone.
-
-A `plan` can only be made if its `eta` is after `block.timestamp + delay`. The `delay` is
-configurable upon construction.
+A `plan` describes a single `delegatecall` operation and a unix timestamp `eta` before which it
+cannot be executed.
 
 A `plan` consists of:
 
-- `usr`: the address to `delegatecall` into
-- `fax`: the `calldata` to use
-- `eta`: the time from when the `plan` can be executed
+- `usr`: address to `delegatecall` into
+- `fax`: `calldata` to use
+- `eta`: first possible (unix) time of execution
 
-## Auth
+Each plan has a unique id, defined as `keccack256(abi.encode(usr, fax, eta))`
 
-`ds-pause` uses a slightly modified form of the [`ds-auth`](https://github.com/dapphub/ds-auth)
-scheme. Changes to auth are potentially highly impactful, and must also be subject to a delay.
+## Operations
 
-`owner` and `authority` can therefore only be changed if an authorized user makes a `plan` to do so.
+Plans can be manipulated in the following ways:
 
-## Interface
+- **`plot`**: schedule a `plan`
+- **`exec`**: execute a `plan`
+- **`drop`**: cancel a `plan`
 
-**`constructor(uint delay)`**
+## Invariants
 
-- Initializes a new instance of the contract with a delay in ms
+**`plot`**
+- A `plan` can only be plotted if its `eta` is after `block.timestamp + delay`
+- A `plan` can only be plotted by authorized users
 
-**`plan(address usr, bytes memory fax uint eta) public auth`**
+**`exec`**
+- A `plan` can only be executed if it has previously been plotted
+- A `plan` can only be executed once it's `eta` has passed
+- A `plan` can only be executed once
+- A `plan` can be executed by anyone
 
-- Plan a call to address `usr` with `fax` calldata that cannot be executed until `block.timestamp >=
-  eta`
-- Fails if `block.timestamp + delay > eta`
-- Returns all data needed to execute or cancel the scheduled call
+**`drop`**
+- A `plan` can only be dropped by authorized users
 
-**`drop(address usr, bytes memory fax, uint eta) public auth`**
+**storage**
+- Auth can only be changed if an authorized user plots a `plan` to do so
+- The `delay` can only be changed if an authorized user plots a `plan` to do so
 
-- Cancels a planned execution
+## Example Usage
 
-**`exec(address usr, bytes memory fax, uint eta) public returns (bytes memory response)`**
+```solidity
+// construct the pause
 
-- `delegatecall` into `usr` with `fax` calldata
-- Fails if the call has not been planned beforehand
-- Fails if `eta > block.timestamp`
-- Returns the `delegatecall` output
+uint delay            = 2 days;
+address owner         = address(0);
+DSAuthority authority = new DSAuthority();
+
+DSPause pause = new DSPause(delay, owner, authority);
+
+// plot the plan
+
+address      usr = address(0x0);
+bytes memory fax = abi.encodeWithSignature("sig()");
+uint         eta = now + delay;
+
+pause.plot(usr, fax, eta);
+```
+
+```solidity
+// wait until block.timestamp is at least now + delay...
+// and then execute the plan
+
+bytes memory out = pause.exec(usr, fax, eta);
+```
 
 ## Tests
 

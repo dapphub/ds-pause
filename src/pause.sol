@@ -55,7 +55,7 @@ contract DSPause is DSAuth, DSNote {
     }
 
     // --- executions ---
-    function plan(address usr, bytes memory fax, uint eta)
+    function plot(address usr, bytes memory fax, uint eta)
         public note auth
     {
         require(eta >= add(now, delay), "ds-pause-delay-not-respected");
@@ -73,7 +73,7 @@ contract DSPause is DSAuth, DSNote {
         returns (bytes memory response)
     {
         require(now >= eta,                 "ds-pause-premature-execution");
-        require(plans[hash(usr, fax, eta)], "ds-pause-unplanned-execution");
+        require(plans[hash(usr, fax, eta)], "ds-pause-unplotted-execution");
 
         plans[hash(usr, fax, eta)] = false;
 

@@ -96,7 +96,7 @@ contract Proposal {
         done = true;
 
         uint era = now + pause.delay();
-        pause.plan(action, payload, era);
+        pause.plot(action, payload, era);
         return (action, payload, era);
     }
 }
@@ -208,7 +208,7 @@ contract Guard is DSAuthority {
     function canCall(address src, address dst, bytes4 sig) public view returns (bool) {
         require(src == address(this));
         require(dst == address(pause));
-        require(sig == bytes4(keccak256("plan(address,bytes,uint256)")));
+        require(sig == bytes4(keccak256("plot(address,bytes,uint256)")));
         return true;
     }
 
@@ -219,7 +219,7 @@ contract Guard is DSAuthority {
         bytes memory fax = abi.encodeWithSignature( "set(address,address)", pause, newAuthority);
         uint         era = now + pause.delay();
 
-        pause.plan(usr, fax, era);
+        pause.plot(usr, fax, era);
         return (usr, fax, era);
     }
 }

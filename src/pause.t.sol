@@ -35,7 +35,7 @@ contract Target {
 
 contract Stranger {
     function plan(DSPause pause, address usr, bytes memory fax, uint eta) public {
-        pause.plan(usr, fax, eta);
+        pause.plot(usr, fax, eta);
     }
     function drop(DSPause pause, address usr, bytes memory fax, uint eta) public {
         pause.drop(usr, fax, eta);
@@ -138,7 +138,7 @@ contract Auth is Test {
         bytes memory fax = abi.encodeWithSignature("set(address,address)", pause, 0xdeadbeef);
         uint         eta = now + pause.delay();
 
-        pause.plan(usr, fax, eta);
+        pause.plot(usr, fax, eta);
         hevm.warp(eta);
         pause.exec(usr, fax, eta);
 
@@ -156,7 +156,7 @@ contract Auth is Test {
         bytes memory fax = abi.encodeWithSignature("set(address,address)", pause, newAuthority);
         uint         eta = now + pause.delay();
 
-        pause.plan(usr, fax, eta);
+        pause.plot(usr, fax, eta);
         hevm.warp(eta);
         pause.exec(usr, fax, eta);
 
@@ -179,7 +179,7 @@ contract Plan is Test {
         bytes memory fax = abi.encodeWithSignature("get()");
         uint         eta = now + pause.delay();
 
-        pause.plan(usr, fax, eta);
+        pause.plot(usr, fax, eta);
 
         bytes32 id = keccak256(abi.encode(usr, fax, eta));
         assertTrue(pause.plans(id));
@@ -194,7 +194,7 @@ contract Exec is Test {
         bytes memory fax = abi.encode(0);
         uint         eta = now + pause.delay();
 
-        pause.plan(usr, fax, eta);
+        pause.plot(usr, fax, eta);
         pause.exec(usr, fax, eta);
     }
 
@@ -203,7 +203,7 @@ contract Exec is Test {
         bytes memory fax = abi.encodeWithSignature("get()");
         uint         eta = now + pause.delay();
 
-        pause.plan(usr, fax, eta);
+        pause.plot(usr, fax, eta);
         hevm.warp(eta);
         pause.exec(usr, fax, eta);
         pause.exec(usr, fax, eta);
@@ -214,7 +214,7 @@ contract Exec is Test {
         bytes memory fax = abi.encodeWithSignature("get()");
         uint         eta = now + pause.delay();
 
-        pause.plan(usr, fax, eta);
+        pause.plot(usr, fax, eta);
         hevm.warp(eta);
         bytes memory out = pause.exec(usr, fax, eta);
 
@@ -226,7 +226,7 @@ contract Exec is Test {
         bytes memory fax = abi.encodeWithSignature("get()");
         uint         eta = now + pause.delay();
 
-        pause.plan(usr, fax, eta);
+        pause.plot(usr, fax, eta);
         hevm.warp(eta);
 
         bytes memory out = stranger.exec(pause, usr, fax, eta);
@@ -243,7 +243,7 @@ contract Drop is Test {
         bytes memory fax = abi.encodeWithSignature("get()");
         uint         eta = now + pause.delay();
 
-        pause.plan(usr, fax, eta);
+        pause.plot(usr, fax, eta);
         hevm.warp(eta);
 
         stranger.drop(pause, usr, fax, eta);
@@ -254,7 +254,7 @@ contract Drop is Test {
         bytes memory fax = abi.encodeWithSignature("get()");
         uint         eta = now + pause.delay();
 
-        pause.plan(usr, fax, eta);
+        pause.plot(usr, fax, eta);
 
         hevm.warp(eta);
         pause.drop(usr, fax, eta);

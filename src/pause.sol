@@ -16,8 +16,9 @@
 pragma solidity >=0.5.0 <0.6.0;
 
 import "ds-auth/auth.sol";
+import "ds-note/note.sol";
 
-contract DSPause is DSAuth {
+contract DSPause is DSAuth, DSNote {
     // --- auth ---
     function setOwner(address owner_) public {
         require(msg.sender == address(this), "ds-pause-undelayed-ownership-change");
@@ -33,11 +34,6 @@ contract DSPause is DSAuth {
         z = x + y;
         require(z >= x, "ds-pause-addition-overflow");
     }
-
-    // --- logs ---
-    event Plan(address usr, bytes fax, uint eta);
-    event Drop(address usr, bytes fax, uint eta);
-    event Exec(address usr, bytes fax, uint eta);
 
     // --- data ---
     mapping (bytes32 => bool) public plans;
@@ -60,22 +56,20 @@ contract DSPause is DSAuth {
 
     // --- executions ---
     function plan(address usr, bytes memory fax, uint eta)
-        public auth
+        public note auth
     {
         require(eta >= add(now, delay), "ds-pause-delay-not-respected");
         plans[hash(usr, fax, eta)] = true;
-        emit Plan(usr, fax, eta);
     }
 
     function drop(address usr, bytes memory fax, uint eta)
-        public auth
+        public note auth
     {
         plans[hash(usr, fax, eta)] = false;
-        emit Drop(usr, fax, eta);
     }
 
     function exec(address usr, bytes memory fax, uint eta)
-        public
+        public note
         returns (bytes memory response)
     {
         require(now >= eta,                 "ds-pause-premature-execution");
@@ -98,7 +92,5 @@ contract DSPause is DSAuth {
                 revert(add(response, 0x20), size)
             }
         }
-
-        emit Exec(usr, fax, eta);
     }
 }

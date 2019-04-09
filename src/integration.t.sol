@@ -31,7 +31,7 @@ contract Hevm {
 }
 
 contract ProposalLike {
-    function plan() public returns (bytes memory);
+    function plot() public returns (bytes memory);
 }
 
 contract Voter {
@@ -91,12 +91,12 @@ contract Proposal {
         payload = payload_;
     }
 
-    function plan() public returns (address, bytes memory, uint) {
+    function plot() public returns (address, bytes memory, uint) {
         require(!done);
         done = true;
 
         uint era = now + pause.delay();
-        pause.plan(action, payload, era);
+        pause.plot(action, payload, era);
         return (action, payload, era);
     }
 }
@@ -170,8 +170,8 @@ contract Voting is Test {
         voter.vote(chief, address(proposal));
         voter.lift(chief, address(proposal));
 
-        // execute proposal (plan action)
-        (address usr, bytes memory fax, uint era) = proposal.plan();
+        // execute proposal (plot plan)
+        (address usr, bytes memory fax, uint era) = proposal.plot();
 
         // wait until delay is passed
         hevm.warp(now + delay);
@@ -208,7 +208,7 @@ contract Guard is DSAuthority {
     function canCall(address src, address dst, bytes4 sig) public view returns (bool) {
         require(src == address(this));
         require(dst == address(pause));
-        require(sig == bytes4(keccak256("plan(address,bytes,uint256)")));
+        require(sig == bytes4(keccak256("plot(address,bytes,uint256)")));
         return true;
     }
 
@@ -219,7 +219,7 @@ contract Guard is DSAuthority {
         bytes memory fax = abi.encodeWithSignature( "set(address,address)", pause, newAuthority);
         uint         era = now + pause.delay();
 
-        pause.plan(usr, fax, era);
+        pause.plot(usr, fax, era);
         return (usr, fax, era);
     }
 }
@@ -256,9 +256,9 @@ contract UpgradeChief is Test {
         voter.vote(oldChief, address(proposal));
         voter.lift(oldChief, address(proposal));
 
-        // plan ownership transfer from old chief to guard
+        // plot plan to transfer ownership from old chief to guard
         uint era;
-        (usr, fax, era) = proposal.plan();
+        (usr, fax, era) = proposal.plot();
 
         // wait until delay is passed
         hevm.warp(era);
@@ -276,7 +276,7 @@ contract UpgradeChief is Test {
         // wait until unlock period has passed
         hevm.warp(lockGuardUntil);
 
-        // plan ownership transfer from guard to newChief
+        // plot plan to transfer ownership from guard to newChief
         (usr, fax, era) = guard.unlock();
 
         // wait until delay has passed

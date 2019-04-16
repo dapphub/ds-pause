@@ -72,8 +72,8 @@ contract DSPause is DSAuth, DSNote {
         public note
         returns (bytes memory response)
     {
-        require(now >= eta,                 "ds-pause-premature-execution");
-        require(plans[hash(usr, fax, eta)], "ds-pause-unplotted-execution");
+        require(now >= eta,                 "ds-pause-premature-exec");
+        require(plans[hash(usr, fax, eta)], "ds-pause-unplotted-plan");
 
         plans[hash(usr, fax, eta)] = false;
 

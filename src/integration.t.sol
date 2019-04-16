@@ -95,9 +95,9 @@ contract Proposal {
         require(!done);
         done = true;
 
-        uint era = now + pause.delay();
-        pause.plot(action, payload, era);
-        return (action, payload, era);
+        uint eta = now + pause.delay();
+        pause.plot(action, payload, eta);
+        return (action, payload, eta);
     }
 }
 
@@ -171,14 +171,14 @@ contract Voting is Test {
         voter.lift(chief, address(proposal));
 
         // execute proposal (plot plan)
-        (address usr, bytes memory fax, uint era) = proposal.plot();
+        (address usr, bytes memory fax, uint eta) = proposal.plot();
 
         // wait until delay is passed
         hevm.warp(now + delay);
 
         // execute action
         assertEq(target.val(), 0);
-        pause.exec(usr, fax, era);
+        pause.exec(usr, fax, eta);
         assertEq(target.val(), 1);
     }
 
@@ -217,10 +217,10 @@ contract Guard is DSAuthority {
 
         address      usr = address(new SetAuthority());
         bytes memory fax = abi.encodeWithSignature( "set(address,address)", pause, newAuthority);
-        uint         era = now + pause.delay();
+        uint         eta = now + pause.delay();
 
-        pause.plot(usr, fax, era);
-        return (usr, fax, era);
+        pause.plot(usr, fax, eta);
+        return (usr, fax, eta);
     }
 }
 
@@ -257,14 +257,14 @@ contract UpgradeChief is Test {
         voter.lift(oldChief, address(proposal));
 
         // plot plan to transfer ownership from old chief to guard
-        uint era;
-        (usr, fax, era) = proposal.plot();
+        uint eta;
+        (usr, fax, eta) = proposal.plot();
 
         // wait until delay is passed
-        hevm.warp(era);
+        hevm.warp(eta);
 
         // execute ownership transfer from old chief to guard
-        pause.exec(usr, fax, era);
+        pause.exec(usr, fax, eta);
 
         // check that the guard is the authority
         assertEq(address(pause.authority()), address(guard));
@@ -277,13 +277,13 @@ contract UpgradeChief is Test {
         hevm.warp(lockGuardUntil);
 
         // plot plan to transfer ownership from guard to newChief
-        (usr, fax, era) = guard.unlock();
+        (usr, fax, eta) = guard.unlock();
 
         // wait until delay has passed
-        hevm.warp(era);
+        hevm.warp(eta);
 
         // execute ownership transfer from guard to newChief
-        pause.exec(usr, fax, era);
+        pause.exec(usr, fax, eta);
 
         // check that the new chief is the authority
         assertEq(address(pause.authority()), address(newChief));

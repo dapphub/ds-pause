@@ -36,17 +36,28 @@ contract Target {
     function get() public pure returns (bytes32) {
         return bytes32("Hello");
     }
+
+    function val() public payable returns (uint) {
+        return msg.value;
+    }
 }
 
 contract Stranger {
-    function plot(DSPause pause, address usr, bytes memory fax, uint eta) public {
-        pause.plot(usr, fax, eta);
+    function plot(DSPause pause, address usr, bytes memory fax, uint val, uint eta)
+        public
+    {
+        pause.plot(usr, fax, val, eta);
     }
-    function drop(DSPause pause, address usr, bytes memory fax, uint eta) public {
-        pause.drop(usr, fax, eta);
+    function drop(DSPause pause, address usr, bytes memory fax, uint val, uint eta)
+        public
+    {
+        pause.drop(usr, fax, val, eta);
     }
-    function exec(DSPause pause, address usr, bytes memory fax, uint eta) public returns (bytes memory) {
-        return pause.exec(usr, fax, eta);
+    function exec(DSPause pause, address usr, bytes memory fax, uint val, uint eta)
+        public payable
+        returns (bytes memory)
+    {
+        return pause.exec.value(msg.value)(usr, fax, val, eta);
     }
 }
 
@@ -88,8 +99,15 @@ contract Test is DSTest {
         pause = new DSPause(delay, address(0x0), new Authority());
     }
 
-    // returns the 1st 32 bytes of data
+    // returns the first 32 bytes of data as a bytes32
     function b32(bytes memory data) public pure returns (bytes32 data32) {
+        assembly {
+            data32 := mload(add(data, 32))
+        }
+    }
+
+    // returns the first 32 bytes of data as a uint
+    function num(bytes memory data) public pure returns (uint data32) {
         assembly {
             data32 := mload(add(data, 32))
         }
@@ -141,11 +159,12 @@ contract Auth is Test {
     function test_set_owner_with_delay() public {
         address      usr = address(new SetOwner());
         bytes memory fax = abi.encodeWithSignature("set(address,address)", pause, 0xdeadbeef);
+        uint         val = 0;
         uint         eta = now + pause.delay();
 
-        pause.plot(usr, fax, eta);
+        pause.plot(usr, fax, val, eta);
         hevm.warp(eta);
-        pause.exec(usr, fax, eta);
+        pause.exec(usr, fax, val, eta);
 
         assertEq(address(pause.owner()), address(0xdeadbeef));
     }
@@ -159,11 +178,12 @@ contract Auth is Test {
 
         address      usr = address(new SetAuthority());
         bytes memory fax = abi.encodeWithSignature("set(address,address)", pause, newAuthority);
+        uint         val = 0;
         uint         eta = now + pause.delay();
 
-        pause.plot(usr, fax, eta);
+        pause.plot(usr, fax, val, eta);
         hevm.warp(eta);
-        pause.exec(usr, fax, eta);
+        pause.exec(usr, fax, val, eta);
 
         assertEq(address(pause.authority()), address(newAuthority));
     }
@@ -174,19 +194,21 @@ contract Plot is Test {
     function testFail_call_from_unauthorized() public {
         address      usr = target;
         bytes memory fax = abi.encodeWithSignature("get()");
+        uint         val = 0;
         uint         eta = now + pause.delay();
 
-        stranger.plot(pause, usr, fax, eta);
+        stranger.plot(pause, usr, fax, val, eta);
     }
 
     function test_plot() public {
         address      usr = target;
         bytes memory fax = abi.encodeWithSignature("get()");
+        uint         val = 0;
         uint         eta = now + pause.delay();
 
-        pause.plot(usr, fax, eta);
+        pause.plot(usr, fax, val, eta);
 
-        bytes32 id = keccak256(abi.encode(usr, fax, eta));
+        bytes32 id = keccak256(abi.encode(usr, fax, val, eta));
         assertTrue(pause.plans(id));
     }
 
@@ -197,41 +219,69 @@ contract Exec is Test {
     function testFail_delay_not_passed() public {
         address      usr = target;
         bytes memory fax = abi.encode(0);
+        uint         val = 0;
         uint         eta = now + pause.delay();
 
-        pause.plot(usr, fax, eta);
-        pause.exec(usr, fax, eta);
+        pause.plot(usr, fax, val, eta);
+        pause.exec(usr, fax, val, eta);
     }
 
     function testFail_double_execution() public {
         address      usr = target;
         bytes memory fax = abi.encodeWithSignature("get()");
+        uint         val = 0;
         uint         eta = now + pause.delay();
 
-        pause.plot(usr, fax, eta);
+        pause.plot(usr, fax, val, eta);
         hevm.warp(eta);
-        pause.exec(usr, fax, eta);
-        pause.exec(usr, fax, eta);
+        pause.exec(usr, fax, val, eta);
+        pause.exec(usr, fax, val, eta);
+    }
+
+    function testFail_exec_value_mismatch() public {
+        address      usr = target;
+        bytes memory fax = abi.encodeWithSignature("val()");
+        uint         val = 1 ether;
+        uint         eta = now + pause.delay();
+
+        pause.plot(usr, fax, val, eta);
+        hevm.warp(eta);
+        pause.exec(usr, fax, val, eta);
+    }
+
+    function test_exec_value_passed() public {
+        address      usr = target;
+        bytes memory fax = abi.encodeWithSignature("val()");
+        uint         val = 1 ether;
+        uint         eta = now + pause.delay();
+
+        pause.plot(usr, fax, val, eta);
+        hevm.warp(eta);
+        bytes memory out = pause.exec.value(val)(usr, fax, val, eta);
+
+        assertEq(num(out), val);
     }
 
     function testFail_exec_plan_with_proxy_ownership_change() public {
         address      usr = target;
         bytes memory fax = abi.encodeWithSignature("give(address)", address(this));
+        uint         val = 0;
         uint         eta = now + pause.delay();
 
-        pause.plot(usr, fax, eta);
+        pause.plot(usr, fax, val, eta);
         hevm.warp(eta);
-        pause.exec(usr, fax, eta);
+        pause.exec(usr, fax, val, eta);
     }
 
     function test_exec_delay_passed() public {
         address      usr = target;
         bytes memory fax = abi.encodeWithSignature("get()");
+        uint         val = 0;
         uint         eta = now + pause.delay();
 
-        pause.plot(usr, fax, eta);
+        pause.plot(usr, fax, val, eta);
         hevm.warp(eta);
-        bytes memory out = pause.exec(usr, fax, eta);
+        bytes memory out = pause.exec(usr, fax, val, eta);
 
         assertEq(b32(out), bytes32("Hello"));
     }
@@ -239,12 +289,13 @@ contract Exec is Test {
     function test_call_from_unauthorized() public {
         address      usr = target;
         bytes memory fax = abi.encodeWithSignature("get()");
+        uint         val = 0;
         uint         eta = now + pause.delay();
 
-        pause.plot(usr, fax, eta);
+        pause.plot(usr, fax, val, eta);
         hevm.warp(eta);
 
-        bytes memory out = stranger.exec(pause, usr, fax, eta);
+        bytes memory out = stranger.exec(pause, usr, fax, val, eta);
 
         assertEq(b32(out), bytes32("Hello"));
     }
@@ -256,23 +307,23 @@ contract Drop is Test {
     function testFail_call_from_unauthorized() public {
         address      usr = target;
         bytes memory fax = abi.encodeWithSignature("get()");
+        uint         val = 0;
         uint         eta = now + pause.delay();
 
-        pause.plot(usr, fax, eta);
+        pause.plot(usr, fax, val, eta);
         hevm.warp(eta);
 
-        stranger.drop(pause, usr, fax, eta);
+        stranger.drop(pause, usr, fax, val, eta);
     }
 
     function test_drop_plotted_plan() public {
         address      usr = target;
         bytes memory fax = abi.encodeWithSignature("get()");
+        uint         val = 0;
         uint         eta = now + pause.delay();
 
-        pause.plot(usr, fax, eta);
-
-        hevm.warp(eta);
-        pause.drop(usr, fax, eta);
+        pause.plot(usr, fax, val, eta);
+        pause.drop(usr, fax, val, eta);
 
         bytes32 id = keccak256(abi.encode(usr, fax, eta));
         assertTrue(!pause.plans(id));

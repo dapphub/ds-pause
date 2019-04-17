@@ -51,37 +51,38 @@ contract DSPause is DSAuth, DSNote {
     }
 
     // --- util ---
-    function hash(address usr, bytes memory fax, uint eta)
+    function hash(address usr, bytes memory fax, uint val, uint eta)
         internal pure
         returns (bytes32)
     {
-        return keccak256(abi.encode(usr, fax, eta));
+        return keccak256(abi.encode(usr, fax, val, eta));
     }
 
     // --- executions ---
-    function plot(address usr, bytes memory fax, uint eta)
+    function plot(address usr, bytes memory fax, uint val, uint eta)
         public note auth
     {
         require(eta >= add(now, delay), "ds-pause-delay-not-respected");
-        plans[hash(usr, fax, eta)] = true;
+        plans[hash(usr, fax, val, eta)] = true;
     }
 
-    function drop(address usr, bytes memory fax, uint eta)
+    function drop(address usr, bytes memory fax, uint val, uint eta)
         public note auth
     {
-        plans[hash(usr, fax, eta)] = false;
+        plans[hash(usr, fax, val, eta)] = false;
     }
 
-    function exec(address usr, bytes memory fax, uint eta)
-        public note
+    function exec(address usr, bytes memory fax, uint val, uint eta)
+        public payable note
         returns (bytes memory out)
     {
-        require(now >= eta,                 "ds-pause-premature-exec");
-        require(plans[hash(usr, fax, eta)], "ds-pause-unplotted-plan");
+        require(now >= eta,                      "ds-pause-premature-exec");
+        require(msg.value == val,                "ds-pause-value-mismatch");
+        require(plans[hash(usr, fax, val, eta)], "ds-pause-unplotted-plan");
 
-        plans[hash(usr, fax, eta)] = false;
+        plans[hash(usr, fax, val, eta)] = false;
 
-        out = proxy.exec(usr, fax);
+        out = proxy.exec.value(val)(usr, fax);
         require(proxy.owner() == address(this), "ds-pause-illegal-storage-change");
     }
 }
@@ -95,7 +96,7 @@ contract DSPauseProxy {
     }
 
     function exec(address usr, bytes memory fax)
-        public
+        public payable
         returns (bytes memory out)
     {
         require(msg.sender == owner, "ds-pause-proxy-unauthorized");

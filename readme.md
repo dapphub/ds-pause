@@ -19,9 +19,10 @@ A `plan` consists of:
 
 - `usr`: address to `delegatecall` into
 - `fax`: `calldata` to use
+- `val`: `msg.value` to use
 - `eta`: first possible (unix) time of execution
 
-Each plan has a unique id, defined as `keccack256(abi.encode(usr, fax, eta))`
+Each plan has a unique id, defined as `keccack256(abi.encode(usr, fax, val, eta))`
 
 ## Operations
 
@@ -40,6 +41,7 @@ Plans can be manipulated in the following ways:
 **`exec`**
 - A `plan` can only be executed if it has previously been plotted
 - A `plan` can only be executed once it's `eta` has passed
+- A `plan` can only be executed if `val` ether is provided
 - A `plan` can only be executed once
 - A `plan` can be executed by anyone
 
@@ -52,7 +54,9 @@ Plans can be manipulated in the following ways:
 - Storage can only be modified through use of the publicly exposed methods
 - The pause will always retain ownership of it's `proxy`
 
-## Identity & Trust
+## UX Considerations
+
+### Identity & Trust
 
 In order to protect the internal storage of the pause from malicious writes during `plan` execution,
 we perform the actual `delegatecall` operation in a seperate contract with an isolated storage
@@ -61,6 +65,13 @@ context (`DSPauseProxy`). Each pause has it's own individual `proxy`.
 This means that `plan`'s are executed with the identity of the `proxy`, and when integrating the
 pause into some auth scheme, you probably want to trust the pause's `proxy` and not the pause
 itself.
+
+### Transfering Value
+
+Because the pause uses `delegatecall`, the `val` specified in the `plan` will not be transfered to
+the `usr`, but will instead remain in the pause and will be made available in the `usr`'s context.
+The `usr` can do whatever it wants with this ether, but any ether left over after the execution of
+the `plan` will be stuck in the pause forever.
 
 ## Example Usage
 
@@ -77,16 +88,17 @@ DSPause pause = new DSPause(delay, owner, authority);
 
 address      usr = address(0x0);
 bytes memory fax = abi.encodeWithSignature("sig()");
+uint         val = 1 ether;
 uint         eta = now + delay;
 
-pause.plot(usr, fax, eta);
+pause.plot(usr, fax, val, eta);
 ```
 
 ```solidity
 // wait until block.timestamp is at least now + delay...
 // and then execute the plan
 
-bytes memory out = pause.exec(usr, fax, eta);
+bytes memory out = pause.exec.value(val)(usr, fax, val, eta);
 ```
 
 ## Tests

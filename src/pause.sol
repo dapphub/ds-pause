@@ -59,10 +59,11 @@ contract DSPause is DSAuth, DSNote {
     }
 
     // --- executions ---
-    function plot(address usr, bytes memory fax, uint eta)
+    function plot(address usr, bytes memory fax)
         public note auth
+        returns (uint eta)
     {
-        require(eta >= add(now, delay), "ds-pause-delay-not-respected");
+        eta = add(now, delay);
         plans[hash(usr, fax, eta)] = true;
     }
 

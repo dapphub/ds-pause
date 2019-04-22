@@ -34,8 +34,8 @@ Plans can be manipulated in the following ways:
 ## Invariants
 
 **`plot`**
-- A `plan` can only be plotted if its `eta` is after `block.timestamp + delay`
 - A `plan` can only be plotted by authorized users
+- Plotted `plan`s will always have an `eta` of `block.timestamp + delay`
 
 **`exec`**
 - A `plan` can only be executed if it has previously been plotted
@@ -77,9 +77,8 @@ DSPause pause = new DSPause(delay, owner, authority);
 
 address      usr = address(0x0);
 bytes memory fax = abi.encodeWithSignature("sig()");
-uint         eta = now + delay;
 
-pause.plot(usr, fax, eta);
+uint eta = pause.plot(usr, fax);
 ```
 
 ```solidity

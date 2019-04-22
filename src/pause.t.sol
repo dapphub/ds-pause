@@ -36,6 +36,10 @@ contract Target {
     function get() public pure returns (bytes32) {
         return bytes32("Hello");
     }
+
+    function error() public pure {
+        require(false, "Test error message");
+    }
 }
 
 contract Stranger {
@@ -217,6 +221,16 @@ contract Exec is Test {
     function testFail_exec_plan_with_proxy_ownership_change() public {
         address      usr = target;
         bytes memory fax = abi.encodeWithSignature("give(address)", address(this));
+        uint         eta = now + pause.delay();
+
+        pause.plot(usr, fax, eta);
+        hevm.warp(eta);
+        pause.exec(usr, fax, eta);
+    }
+
+    function test_error_propogation() public {
+        address      usr = target;
+        bytes memory fax = abi.encodeWithSignature("error()");
         uint         eta = now + pause.delay();
 
         pause.plot(usr, fax, eta);

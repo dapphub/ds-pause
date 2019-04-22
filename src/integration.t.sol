@@ -82,13 +82,13 @@ contract Proposal {
     bool done = false;
 
     DSPause pause;
-    address action;
-    bytes   payload;
+    address usr;
+    bytes   fax;
 
-    constructor(DSPause pause_, address action_, bytes memory payload_) public {
+    constructor(DSPause pause_, address usr_, bytes memory fax_) public {
         pause = pause_;
-        action = action_;
-        payload = payload_;
+        usr = usr_;
+        fax = fax_;
     }
 
     function plot() public returns (address, bytes memory, uint) {
@@ -96,8 +96,8 @@ contract Proposal {
         done = true;
 
         uint eta = now + pause.delay();
-        pause.plot(action, payload, eta);
-        return (action, payload, eta);
+        pause.plot(usr, fax, eta);
+        return (usr, fax, eta);
     }
 }
 
@@ -113,7 +113,6 @@ contract Test is DSTest {
     Voter voter;
 
     // pause timings
-    uint start = 0;
     uint delay = 1 days;
 
     // gov constants
@@ -126,7 +125,7 @@ contract Test is DSTest {
     function setUp() public {
         // init hevm
         hevm = Hevm(0x7109709ECfa91a80626fF3989D68f67F5b1DD12D);
-        hevm.warp(start);
+        hevm.warp(0);
 
         // create test harness
         target = new Target();
@@ -163,7 +162,11 @@ contract Voting is Test {
 
         // create proposal
         SimpleAction action = new SimpleAction();
-        Proposal proposal = new Proposal(pause, address(action), abi.encodeWithSignature("exec(address)", target));
+        Proposal proposal = new Proposal(
+            pause,
+            address(action),
+            abi.encodeWithSignature("exec(address)", target)
+        );
 
         // make proposal the hat
         voter.lock(chief, votes);

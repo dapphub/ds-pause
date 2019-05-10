@@ -51,58 +51,82 @@ contract DSPause is DSAuth, DSNote {
     }
 
     // --- util ---
-    function hash(address usr, bytes memory fax, uint eta)
+    function hash(address usr, bytes memory fax, uint gas, uint eta)
         internal pure
         returns (bytes32)
     {
-        return keccak256(abi.encode(usr, fax, eta));
+        return keccak256(abi.encode(usr, fax, gas, eta));
     }
 
-    // --- executions ---
-    function plot(address usr, bytes memory fax, uint eta)
+    // --- operations ---
+    function plot(address usr, bytes memory fax, uint gas, uint eta)
         public note auth
     {
         require(eta >= add(now, delay), "ds-pause-delay-not-respected");
-        plans[hash(usr, fax, eta)] = true;
+        plans[hash(usr, fax, gas, eta)] = true;
     }
 
-    function drop(address usr, bytes memory fax, uint eta)
+    function drop(address usr, bytes memory fax, uint gas, uint eta)
         public note auth
     {
-        plans[hash(usr, fax, eta)] = false;
+        plans[hash(usr, fax, gas, eta)] = false;
     }
 
-    function exec(address usr, bytes memory fax, uint eta)
+    function exec(address usr, bytes memory fax, uint gas, uint eta)
         public note
         returns (bytes memory out)
     {
-        require(now >= eta,                 "ds-pause-premature-exec");
-        require(plans[hash(usr, fax, eta)], "ds-pause-unplotted-plan");
+        require(now >= eta,                      "ds-pause-premature-exec");
+        require(plans[hash(usr, fax, gas, eta)], "ds-pause-unplotted-plan");
 
-        plans[hash(usr, fax, eta)] = false;
+        plans[hash(usr, fax, gas, eta)] = false;
 
-        out = proxy.exec(usr, fax);
+        out = proxy.exec(usr, fax, gas);
         require(proxy.owner() == address(this), "ds-pause-illegal-storage-change");
     }
 }
 
-// plans are executed in an isolated storage context to protect the storage on
-// the pause from malicious plans
+// plans are executed in an isolated storage context to protect the pause from
+// malicious storage modification during plan execution
 contract DSPauseProxy {
+    // --- auth ---
     address public owner;
+    modifier auth() { require(msg.sender == owner, "ds-pause-proxy-unauthorized"); _; }
+
+    // --- math ---
+    function sub(uint x, uint y) internal pure returns (uint z) {
+        require((z = x - y) <= x, "ds-pause-proxy-sub-underflow");
+    }
+
+    // --- init ---
     constructor(address owner_) public {
         owner = owner_;
     }
 
-    function exec(address usr, bytes memory fax)
-        public
+    // --- util ---
+    function codehash(address usr) internal view returns (bytes32 tag) {
+        assembly { tag := extcodehash(usr) }
+    }
+    // EIP-150 max_call_gas with a 500 gas buffer to cover execution costs and
+    // gas schedule changes
+    function max_call_gas(uint gas) internal pure returns (uint) {
+        uint max = sub(gas, gas / 64);
+        return sub(max, 500);
+    }
+
+    // --- calls ---
+    // sag == gas. required due to name collision with the GAS opcode.
+    function exec(address usr, bytes memory fax, uint sag)
+        public auth
         returns (bytes memory response)
     {
-        require(msg.sender == owner, "ds-pause-proxy-unauthorized");
+        // See EIP-150 for details on this calculation
+        require(codehash(usr) != 0,            "ds-pause-proxy-non-existent-usr");
+        require(sag < max_call_gas(gasleft()), "ds-pause-proxy-insufficient-gas");
 
         // delegatecall implementation from ds-proxy
         assembly {
-            let succeeded := delegatecall(sub(gas, 5000), usr, add(fax, 0x20), mload(fax), 0, 0)
+            let succeeded := delegatecall(sag, usr, add(fax, 0x20), mload(fax), 0, 0)
             let size := returndatasize
 
             response := mload(0x40)

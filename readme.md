@@ -19,9 +19,10 @@ A `plan` consists of:
 
 - `usr`: address to `delegatecall` into
 - `fax`: `calldata` to use
+- `gas`: the gas to provided to the `delegatecall`
 - `eta`: first possible (unix) time of execution
 
-Each plan has a unique id, defined as `keccack256(abi.encode(usr, fax, eta))`
+Each plan has a unique id, defined as `keccack256(abi.encode(usr, fax, gas, eta))`
 
 ## Operations
 
@@ -33,6 +34,7 @@ Plans can be manipulated in the following ways:
 
 ## Invariants
 
+<<<<<<< HEAD
 A break of any of the following would be classified as a critical issue. Please submit bug reports
 to security@dapp.org.
 
@@ -44,6 +46,17 @@ to security@dapp.org.
 **auth**
 - `authority` and `owner` can only be changed if an authorized user plots a `plan` to do so
 
+=======
+The following invariants should capture all the behaviour we care about. A break of any of any one
+would be considered a critical bug.
+
+**high level**
+- There is no way to bypass the delay
+- The caller of `exec` has no influence over the parameters of the `delegatecall`
+- The code executed by the `delegatecall` cannot directly modify storage on the pause
+- The pause will always retain ownership of it's `proxy`
+
+>>>>>>> Specify gas as part of plan
 **`plot`**
 - A `plan` can only be plotted if its `eta` is after `block.timestamp + delay`
 - A `plan` can only be plotted by authorized users
@@ -51,6 +64,7 @@ to security@dapp.org.
 **`exec`**
 - A `plan` can only be executed if it has previously been plotted
 - A `plan` can only be executed once it's `eta` has passed
+- A `plan` can only be executed if the caller provides sufficient gas
 - A `plan` can only be executed once
 - A `plan` can be executed by anyone
 
@@ -82,16 +96,17 @@ DSPause pause = new DSPause(delay, owner, authority);
 
 address      usr = address(0x0);
 bytes memory fax = abi.encodeWithSignature("sig()");
+uint         gas = 50000;
 uint         eta = now + delay;
 
-pause.plot(usr, fax, eta);
+pause.plot(usr, fax, gas, eta);
 ```
 
 ```solidity
-// wait until block.timestamp is at least now + delay...
+// wait until block.timestamp is at least eta
 // and then execute the plan
 
-bytes memory out = pause.exec(usr, fax, eta);
+bytes memory out = pause.exec(usr, fax, gas, eta);
 ```
 
 ## Tests

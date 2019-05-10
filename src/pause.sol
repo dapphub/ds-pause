@@ -96,12 +96,24 @@ contract DSPauseProxy {
 
     function exec(address usr, bytes memory fax)
         public
-        returns (bytes memory out)
+        returns (bytes memory response)
     {
         require(msg.sender == owner, "ds-pause-proxy-unauthorized");
 
-        bool ok;
-        (ok, out) = usr.delegatecall(fax);
-        require(ok, "ds-pause-delegatecall-error");
+        // delegatecall implementation from ds-proxy
+        assembly {
+            let succeeded := delegatecall(sub(gas, 5000), usr, add(fax, 0x20), mload(fax), 0, 0)
+            let size := returndatasize
+
+            response := mload(0x40)
+            mstore(0x40, add(response, and(add(add(size, 0x20), 0x1f), not(0x1f))))
+            mstore(response, size)
+            returndatacopy(add(response, 0x20), 0, size)
+
+            switch iszero(succeeded)
+            case 1 {
+                revert(add(response, 0x20), size)
+            }
+        }
     }
 }

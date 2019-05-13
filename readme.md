@@ -38,8 +38,8 @@ to security@dapp.org.
 
 **high level**
 - There is no way to bypass the delay
-- The code executed by the delegatecall cannot directly modify storage on the pause
-- The pause will always retain ownership of it's proxy
+- The code executed by the `delegatecall` cannot directly modify storage on the pause
+- The pause will always retain ownership of it's `proxy`
 
 **auth**
 - `authority` and `owner` can only be changed if an authorized user plots a `plan` to do so

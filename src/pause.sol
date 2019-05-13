@@ -86,8 +86,8 @@ contract DSPause is DSAuth, DSNote {
     }
 }
 
-// plans are executed in an isolated storage context to protect the storage on
-// the pause from malicious plans
+// plans are executed in an isolated storage context to protect the pause from
+// malicious storage modification during plan execution
 contract DSPauseProxy {
     address public owner;
     constructor(address owner_) public {

@@ -14,6 +14,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 pragma solidity >=0.5.0 <0.6.0;
+pragma experimental ABIEncoderV2;
 
 import "ds-auth/auth.sol";
 import "ds-note/note.sol";
@@ -42,6 +43,12 @@ contract DSPause is DSAuth, DSNote {
     DSPauseProxy public proxy;
     uint         public delay;
 
+    struct Plan {
+        address usr;
+        bytes   fax;
+        uint    eta;
+    }
+
     // --- init ---
     constructor(uint delay_, address owner_, DSAuthority authority_) public {
         delay = delay_;
@@ -51,37 +58,37 @@ contract DSPause is DSAuth, DSNote {
     }
 
     // --- util ---
-    function hash(address usr, bytes memory fax, uint eta)
+    function hash(Plan memory plan)
         internal pure
         returns (bytes32)
     {
-        return keccak256(abi.encode(usr, fax, eta));
+        return keccak256(abi.encode(plan.usr, plan.fax, plan.eta));
     }
 
     // --- executions ---
-    function plot(address usr, bytes memory fax, uint eta)
+    function plot(Plan memory plan)
         public note auth
     {
-        require(eta >= add(now, delay), "ds-pause-delay-not-respected");
-        plans[hash(usr, fax, eta)] = true;
+        require(plan.eta >= add(now, delay), "ds-pause-delay-not-respected");
+        plans[hash(plan)] = true;
     }
 
-    function drop(address usr, bytes memory fax, uint eta)
+    function drop(Plan memory plan)
         public note auth
     {
-        plans[hash(usr, fax, eta)] = false;
+        plans[hash(plan)] = false;
     }
 
-    function exec(address usr, bytes memory fax, uint eta)
+    function exec(Plan memory plan)
         public note
         returns (bytes memory out)
     {
-        require(now >= eta,                 "ds-pause-premature-exec");
-        require(plans[hash(usr, fax, eta)], "ds-pause-unplotted-plan");
+        require(now >= plan.eta,   "ds-pause-premature-exec");
+        require(plans[hash(plan)], "ds-pause-unplotted-plan");
 
-        plans[hash(usr, fax, eta)] = false;
+        plans[hash(plan)] = false;
 
-        out = proxy.exec(usr, fax);
+        out = proxy.exec(plan.usr, plan.fax);
         require(proxy.owner() == address(this), "ds-pause-illegal-storage-change");
     }
 }
@@ -95,8 +102,7 @@ contract DSPauseProxy {
     }
 
     function exec(address usr, bytes memory fax)
-        public
-        returns (bytes memory out)
+        public returns (bytes memory out)
     {
         require(msg.sender == owner, "ds-pause-proxy-unauthorized");
 

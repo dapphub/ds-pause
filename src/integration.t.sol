@@ -14,13 +14,14 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 pragma solidity >=0.5.0 <0.6.0;
+pragma experimental ABIEncoderV2;
 
-import "ds-test/test.sol";
-import "ds-chief/chief.sol";
-import "ds-token/token.sol";
-import "ds-proxy/proxy.sol";
+import {DSTest}  from "ds-test/test.sol";
+import {DSToken} from "ds-token/token.sol";
+import {DSAuth, DSAuthority} from "ds-auth/auth.sol";
+import {DSChief, DSChiefFab} from "ds-chief/chief.sol";
 
-import "./pause.sol";
+import {DSPause, DSPauseProxy} from "./pause.sol";
 
 // ------------------------------------------------------------------
 // Test Harness
@@ -82,22 +83,21 @@ contract Proposal {
     bool done = false;
 
     DSPause pause;
-    address usr;
-    bytes   fax;
+    DSPause.Plan plan;
 
-    constructor(DSPause pause_, address usr_, bytes memory fax_) public {
+    constructor(DSPause pause_, address usr, bytes memory fax) public {
         pause = pause_;
-        usr = usr_;
-        fax = fax_;
+        plan.usr = usr;
+        plan.fax = fax;
     }
 
-    function plot() public returns (address, bytes memory, uint) {
+    function plot() public returns (DSPause.Plan memory) {
         require(!done);
         done = true;
 
-        uint eta = now + pause.delay();
-        pause.plot(usr, fax, eta);
-        return (usr, fax, eta);
+        plan.eta = now + pause.delay();
+        pause.plot(plan);
+        return plan;
     }
 }
 
@@ -174,14 +174,14 @@ contract Voting is Test {
         voter.lift(chief, address(proposal));
 
         // execute proposal (plot plan)
-        (address usr, bytes memory fax, uint eta) = proposal.plot();
+        DSPause.Plan memory plan = proposal.plot();
 
         // wait until delay is passed
-        hevm.warp(now + delay);
+        hevm.warp(plan.eta);
 
         // execute action
         assertEq(target.val(), 0);
-        pause.exec(usr, fax, eta);
+        pause.exec(plan);
         assertEq(target.val(), 1);
     }
 
@@ -215,15 +215,16 @@ contract Guard is DSAuthority {
         return true;
     }
 
-    function unlock() public returns (address, bytes memory, uint) {
+    function unlock() public returns (DSPause.Plan memory plan) {
         require(now >= lockUntil);
 
-        address      usr = address(new SetAuthority());
-        bytes memory fax = abi.encodeWithSignature( "set(address,address)", pause, newAuthority);
-        uint         eta = now + pause.delay();
+        DSPause.Plan memory plan = DSPause.Plan({
+            usr: address(new SetAuthority()),
+            fax: abi.encodeWithSignature( "set(address,address)", pause, newAuthority),
+            eta: now + pause.delay()
+        });
 
-        pause.plot(usr, fax, eta);
-        return (usr, fax, eta);
+        pause.plot(plan);
     }
 }
 
@@ -260,14 +261,13 @@ contract UpgradeChief is Test {
         voter.lift(oldChief, address(proposal));
 
         // plot plan to transfer ownership from old chief to guard
-        uint eta;
-        (usr, fax, eta) = proposal.plot();
+        DSPause.Plan memory plan = proposal.plot();
 
         // wait until delay is passed
-        hevm.warp(eta);
+        hevm.warp(plan.eta);
 
         // execute ownership transfer from old chief to guard
-        pause.exec(usr, fax, eta);
+        pause.exec(plan);
 
         // check that the guard is the authority
         assertEq(address(pause.authority()), address(guard));
@@ -280,13 +280,13 @@ contract UpgradeChief is Test {
         hevm.warp(lockGuardUntil);
 
         // plot plan to transfer ownership from guard to newChief
-        (usr, fax, eta) = guard.unlock();
+        plan = guard.unlock();
 
         // wait until delay has passed
-        hevm.warp(eta);
+        hevm.warp(plan.eta);
 
         // execute ownership transfer from guard to newChief
-        pause.exec(usr, fax, eta);
+        pause.exec(plan);
 
         // check that the new chief is the authority
         assertEq(address(pause.authority()), address(newChief));

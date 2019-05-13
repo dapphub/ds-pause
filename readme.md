@@ -33,6 +33,17 @@ Plans can be manipulated in the following ways:
 
 ## Invariants
 
+A break of any of the following would be classified as a critical issue. Please submit bug reports
+to security@dapp.org.
+
+**high level**
+- There is no way to bypass the delay
+- The code executed by the delegatecall cannot directly modify storage on the pause
+- The pause will always retain ownership of it's proxy
+
+**auth**
+- `authority` and `owner` can only be changed if an authorized user plots a `plan` to do so
+
 **`plot`**
 - A `plan` can only be plotted if its `eta` is after `block.timestamp + delay`
 - A `plan` can only be plotted by authorized users
@@ -45,12 +56,6 @@ Plans can be manipulated in the following ways:
 
 **`drop`**
 - A `plan` can only be dropped by authorized users
-
-**storage**
-- Auth can only be changed if an authorized user plots a `plan` to do so
-- The `delay` can only be changed if an authorized user plots a `plan` to do so
-- Storage can only be modified through use of the publicly exposed methods
-- The pause will always retain ownership of it's `proxy`
 
 ## Identity & Trust
 

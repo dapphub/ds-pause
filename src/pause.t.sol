@@ -179,7 +179,15 @@ contract Plot is Test {
         stranger.plot(pause, usr, fax, eta);
     }
 
-    function test_plot() public {
+    function testFail_plot_eta_too_soon() public {
+        address      usr = target;
+        bytes memory fax = abi.encodeWithSignature("get()");
+        uint         eta = now;
+
+        pause.plot(usr, fax, eta);
+    }
+
+    function test_plot_populates_plans_mapping() public {
         address      usr = target;
         bytes memory fax = abi.encodeWithSignature("get()");
         uint         eta = now + pause.delay();
@@ -224,7 +232,7 @@ contract Exec is Test {
         pause.exec(usr, fax, eta);
     }
 
-    function test_exec_delay_passed() public {
+    function test_suceeds_when_delay_passed() public {
         address      usr = target;
         bytes memory fax = abi.encodeWithSignature("get()");
         uint         eta = now + pause.delay();
@@ -236,7 +244,7 @@ contract Exec is Test {
         assertEq(b32(out), bytes32("Hello"));
     }
 
-    function test_call_from_unauthorized() public {
+    function test_suceeds_when_called_from_unauthorized() public {
         address      usr = target;
         bytes memory fax = abi.encodeWithSignature("get()");
         uint         eta = now + pause.delay();
@@ -245,7 +253,18 @@ contract Exec is Test {
         hevm.warp(eta);
 
         bytes memory out = stranger.exec(pause, usr, fax, eta);
+        assertEq(b32(out), bytes32("Hello"));
+    }
 
+    function test_suceeds_when_called_from_authorized() public {
+        address      usr = target;
+        bytes memory fax = abi.encodeWithSignature("get()");
+        uint         eta = now + pause.delay();
+
+        pause.plot(usr, fax, eta);
+        hevm.warp(eta);
+
+        bytes memory out = pause.exec(usr, fax, eta);
         assertEq(b32(out), bytes32("Hello"));
     }
 

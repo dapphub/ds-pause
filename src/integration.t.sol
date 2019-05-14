@@ -15,10 +15,10 @@
 
 pragma solidity >=0.5.0 <0.6.0;
 
-import "ds-test/test.sol";
-import "ds-chief/chief.sol";
-import "ds-token/token.sol";
-import "ds-proxy/proxy.sol";
+import {DSTest} from "ds-test/test.sol";
+import {DSToken} from "ds-token/token.sol";
+import {DSProxy} from "ds-proxy/proxy.sol";
+import {DSChief, DSChiefFab} from "ds-chief/chief.sol";
 
 import "./pause.sol";
 

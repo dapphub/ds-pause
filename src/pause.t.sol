@@ -85,8 +85,10 @@ contract Test is DSTest {
         target = address(new Target());
         stranger = new Stranger();
 
-        uint delay = 1;
+        uint delay = 1 days;
         pause = new DSPause(delay, address(0x0), new Authority());
+
+
     }
 
     // returns the 1st 32 bytes of data
@@ -94,6 +96,22 @@ contract Test is DSTest {
         assembly {
             data32 := mload(add(data, 32))
         }
+    }
+}
+
+// ------------------------------------------------------------------
+// Proxy Scripts
+// ------------------------------------------------------------------
+
+contract AdminScripts {
+    function setDelay(DSPause pause, uint delay) public {
+        pause.setDelay(delay);
+    }
+    function setOwner(DSPause pause, address owner) public {
+        pause.setOwner(owner);
+    }
+    function setAuthority(DSPause pause, DSAuthority authority) public {
+        pause.setAuthority(authority);
     }
 }
 
@@ -121,27 +139,17 @@ contract Constructor is DSTest {
 
 }
 
-contract SetAuthority {
-    function set(DSAuth usr, DSAuthority authority) public {
-        usr.setAuthority(authority);
-    }
-}
+contract Admin is Test {
 
-contract SetOwner {
-    function set(DSAuth usr, address owner) public {
-        usr.setOwner(owner);
-    }
-}
-
-contract Auth is Test {
+    // --- owner ---
 
     function testFail_cannot_set_owner_without_delay() public {
         pause.setOwner(address(this));
     }
 
     function test_set_owner_with_delay() public {
-        address      usr = address(new SetOwner());
-        bytes memory fax = abi.encodeWithSignature("set(address,address)", pause, 0xdeadbeef);
+        address      usr = address(new AdminScripts());
+        bytes memory fax = abi.encodeWithSignature("setOwner(address,address)", pause, 0xdeadbeef);
         uint         eta = now + pause.delay();
 
         pause.plot(usr, fax, eta);
@@ -151,6 +159,8 @@ contract Auth is Test {
         assertEq(address(pause.owner()), address(0xdeadbeef));
     }
 
+    // --- authority ---
+
     function testFail_cannot_set_authority_without_delay() public {
         pause.setAuthority(new Authority());
     }
@@ -158,8 +168,8 @@ contract Auth is Test {
     function test_set_authority_with_delay() public {
         DSAuthority newAuthority = new Authority();
 
-        address      usr = address(new SetAuthority());
-        bytes memory fax = abi.encodeWithSignature("set(address,address)", pause, newAuthority);
+        address      usr = address(new AdminScripts());
+        bytes memory fax = abi.encodeWithSignature("setAuthority(address,address)", pause, newAuthority);
         uint         eta = now + pause.delay();
 
         pause.plot(usr, fax, eta);
@@ -167,6 +177,24 @@ contract Auth is Test {
         pause.exec(usr, fax, eta);
 
         assertEq(address(pause.authority()), address(newAuthority));
+    }
+
+    // --- delay ---
+
+    function testFail_cannot_set_delay_without_delay() public {
+        pause.setDelay(0);
+    }
+
+    function test_set_delay_with_delay() public {
+        address      usr = address(new AdminScripts());
+        bytes memory fax = abi.encodeWithSignature("setDelay(address,uint256)", pause, 0);
+        uint         eta = now + pause.delay();
+
+        pause.plot(usr, fax, eta);
+        hevm.warp(eta);
+        pause.exec(usr, fax, eta);
+
+        assertEq(pause.delay(), 0);
     }
 }
 

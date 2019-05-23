@@ -41,8 +41,8 @@ to security@dapp.org.
 - The code executed by the `delegatecall` cannot directly modify storage on the pause
 - The pause will always retain ownership of it's `proxy`
 
-**auth**
-- `authority` and `owner` can only be changed if an authorized user plots a `plan` to do so
+**admin**
+- `authority`, `owner`, and `delay` can only be changed if an authorized user plots a `plan` to do so
 
 **`plot`**
 - A `plan` can only be plotted if its `eta` is after `block.timestamp + delay`

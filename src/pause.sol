@@ -19,16 +19,20 @@ import {DSNote} from "ds-note/note.sol";
 import {DSAuth, DSAuthority} from "ds-auth/auth.sol";
 
 contract DSPause is DSAuth, DSNote {
-    // --- auth ---
-    function setOwner(address owner_) public {
-        require(msg.sender == address(proxy), "ds-pause-undelayed-ownership-change");
+    // --- admin ---
+    modifier wait() {
+        require(msg.sender == address(proxy), "ds-pause-undelayed-call"); _;
+    }
+    function setOwner(address owner_) public wait {
         owner = owner_;
         emit LogSetOwner(owner);
     }
-    function setAuthority(DSAuthority authority_) public {
-        require(msg.sender == address(proxy), "ds-pause-undelayed-authority-change");
+    function setAuthority(DSAuthority authority_) public wait {
         authority = authority_;
         emit LogSetAuthority(address(authority));
+    }
+    function setDelay(uint delay_) public note wait {
+        delay = delay_;
     }
 
     // --- math ---

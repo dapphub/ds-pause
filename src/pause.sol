@@ -19,10 +19,11 @@ import {DSNote} from "ds-note/note.sol";
 import {DSAuth, DSAuthority} from "ds-auth/auth.sol";
 
 contract DSPause is DSAuth, DSNote {
+
     // --- admin ---
-    modifier wait() {
-        require(msg.sender == address(proxy), "ds-pause-undelayed-call"); _;
-    }
+
+    modifier wait { require(msg.sender == address(proxy), "ds-pause-undelayed-call"); _; }
+
     function setOwner(address owner_) public wait {
         owner = owner_;
         emit LogSetOwner(owner);
@@ -36,17 +37,20 @@ contract DSPause is DSAuth, DSNote {
     }
 
     // --- math ---
+
     function add(uint x, uint y) internal pure returns (uint z) {
         z = x + y;
         require(z >= x, "ds-pause-addition-overflow");
     }
 
     // --- data ---
+
     mapping (bytes32 => bool) public plans;
     DSPauseProxy public proxy;
     uint         public delay;
 
     // --- init ---
+
     constructor(uint delay_, address owner_, DSAuthority authority_) public {
         delay = delay_;
         owner = owner_;
@@ -55,6 +59,7 @@ contract DSPause is DSAuth, DSNote {
     }
 
     // --- util ---
+
     function hash(address usr, bytes memory fax, uint eta)
         internal pure
         returns (bytes32)
@@ -62,7 +67,8 @@ contract DSPause is DSAuth, DSNote {
         return keccak256(abi.encode(usr, fax, eta));
     }
 
-    // --- executions ---
+    // --- operations ---
+
     function plot(address usr, bytes memory fax, uint eta)
         public note auth
     {

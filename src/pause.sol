@@ -15,10 +15,9 @@
 
 pragma solidity >=0.5.0 <0.6.0;
 
-import {DSNote} from "ds-note/note.sol";
 import {DSAuth, DSAuthority} from "ds-auth/auth.sol";
 
-contract DSPause is DSAuth, DSNote {
+contract DSPause is DSAuth {
     // --- admin ---
     modifier wait() {
         require(msg.sender == address(proxy), "ds-pause-undelayed-call"); _;
@@ -31,8 +30,9 @@ contract DSPause is DSAuth, DSNote {
         authority = authority_;
         emit LogSetAuthority(address(authority));
     }
-    function setDelay(uint delay_) public note wait {
+    function setDelay(uint delay_) public wait {
         delay = delay_;
+        emit SetDelay(delay_);
     }
 
     // --- math ---
@@ -40,6 +40,12 @@ contract DSPause is DSAuth, DSNote {
         z = x + y;
         require(z >= x, "ds-pause-addition-overflow");
     }
+
+    // --- logs ---
+    event Plan(address indexed usr, bytes indexed fax, uint indexed eta);
+    event Drop(address indexed usr, bytes indexed fax, uint indexed eta);
+    event Exec(address indexed usr, bytes indexed fax, uint indexed eta);
+    event SetDelay(uint delay);
 
     // --- data ---
     mapping (bytes32 => bool) public plans;
@@ -56,29 +62,30 @@ contract DSPause is DSAuth, DSNote {
 
     // --- util ---
     function hash(address usr, bytes memory fax, uint eta)
-        internal pure
-        returns (bytes32)
+        internal pure returns (bytes32)
     {
         return keccak256(abi.encode(usr, fax, eta));
     }
 
     // --- executions ---
     function plot(address usr, bytes memory fax, uint eta)
-        public note auth
+        public auth
     {
         require(eta >= add(now, delay), "ds-pause-delay-not-respected");
+
         plans[hash(usr, fax, eta)] = true;
+        emit Plan(usr, fax, eta);
     }
 
     function drop(address usr, bytes memory fax, uint eta)
-        public note auth
+        public auth
     {
         plans[hash(usr, fax, eta)] = false;
+        emit Drop(usr, fax, eta);
     }
 
     function exec(address usr, bytes memory fax, uint eta)
-        public note
-        returns (bytes memory out)
+        public returns (bytes memory out)
     {
         require(now >= eta,                 "ds-pause-premature-exec");
         require(plans[hash(usr, fax, eta)], "ds-pause-unplotted-plan");
@@ -87,6 +94,8 @@ contract DSPause is DSAuth, DSNote {
 
         out = proxy.exec(usr, fax);
         require(proxy.owner() == address(this), "ds-pause-illegal-storage-change");
+
+        emit Exec(usr, fax, eta);
     }
 }
 

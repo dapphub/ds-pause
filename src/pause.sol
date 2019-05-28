@@ -51,7 +51,7 @@ contract DSPause is DSAuth, DSNote {
         delay = delay_;
         owner = owner_;
         authority = authority_;
-        proxy = new DSPauseProxy(address(this));
+        proxy = new DSPauseProxy();
     }
 
     // --- util ---
@@ -94,16 +94,13 @@ contract DSPause is DSAuth, DSNote {
 // malicious storage modification during plan execution
 contract DSPauseProxy {
     address public owner;
-    constructor(address owner_) public {
-        owner = owner_;
-    }
+    modifier auth { require(msg.sender == owner, "ds-pause-proxy-unauthorized"); _; }
+    constructor() public { owner = msg.sender; }
 
     function exec(address usr, bytes memory fax)
-        public
+        public auth
         returns (bytes memory out)
     {
-        require(msg.sender == owner, "ds-pause-proxy-unauthorized");
-
         bool ok;
         (ok, out) = usr.delegatecall(fax);
         require(ok, "ds-pause-delegatecall-error");

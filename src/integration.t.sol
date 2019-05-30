@@ -83,21 +83,23 @@ contract Proposal {
 
     DSPause pause;
     address usr;
+    bytes32 tag;
     bytes   fax;
 
-    constructor(DSPause pause_, address usr_, bytes memory fax_) public {
+    constructor(DSPause pause_, address usr_, bytes32 tag_, bytes memory fax_) public {
         pause = pause_;
+        tag = tag_;
         usr = usr_;
         fax = fax_;
     }
 
-    function plot() public returns (address, bytes memory, uint) {
+    function plot() public returns (address, bytes32, bytes memory, uint) {
         require(!done);
         done = true;
 
         uint eta = now + pause.delay();
-        pause.plot(usr, fax, eta);
-        return (usr, fax, eta);
+        pause.plot(usr, tag, fax, eta);
+        return (usr, tag, fax, eta);
     }
 }
 
@@ -139,6 +141,10 @@ contract Test is DSTest {
         // chief fab
         chiefFab = new DSChiefFab();
     }
+
+    function extcodehash(address usr) internal view returns (bytes32 tag) {
+        assembly { tag := extcodehash(usr) }
+    }
 }
 
 // ------------------------------------------------------------------
@@ -161,12 +167,11 @@ contract Voting is Test {
         target.deny(address(this));
 
         // create proposal
-        SimpleAction action = new SimpleAction();
-        Proposal proposal = new Proposal(
-            pause,
-            address(action),
-            abi.encodeWithSignature("exec(address)", target)
-        );
+        address      usr = address(new SimpleAction());
+        bytes32      tag = extcodehash(usr);
+        bytes memory fax = abi.encodeWithSignature("exec(address)", target);
+
+        Proposal proposal = new Proposal(pause, usr, tag, fax);
 
         // make proposal the hat
         voter.lock(chief, votes);
@@ -174,14 +179,15 @@ contract Voting is Test {
         voter.lift(chief, address(proposal));
 
         // execute proposal (plot plan)
-        (address usr, bytes memory fax, uint eta) = proposal.plot();
+        uint eta;
+        (usr, tag, fax, eta) = proposal.plot();
 
-        // wait until delay is passed
-        hevm.warp(now + delay);
+        // wait until eta
+        hevm.warp(eta);
 
         // execute action
         assertEq(target.val(), 0);
-        pause.exec(usr, fax, eta);
+        pause.exec(usr, tag, fax, eta);
         assertEq(target.val(), 1);
     }
 
@@ -211,19 +217,20 @@ contract Guard is DSAuthority {
     function canCall(address src, address dst, bytes4 sig) public view returns (bool) {
         require(src == address(this));
         require(dst == address(pause));
-        require(sig == bytes4(keccak256("plot(address,bytes,uint256)")));
+        require(sig == bytes4(keccak256("plot(address,bytes32,bytes,uint256)")));
         return true;
     }
 
-    function unlock() public returns (address, bytes memory, uint) {
+    function unlock() public returns (address, bytes32, bytes memory, uint) {
         require(now >= lockUntil);
 
         address      usr = address(new SetAuthority());
+        bytes32      tag;  assembly { tag := extcodehash(usr) }
         bytes memory fax = abi.encodeWithSignature( "set(address,address)", pause, newAuthority);
         uint         eta = now + pause.delay();
 
-        pause.plot(usr, fax, eta);
-        return (usr, fax, eta);
+        pause.plot(usr, tag, fax, eta);
+        return (usr, tag, fax, eta);
     }
 }
 
@@ -248,8 +255,10 @@ contract UpgradeChief is Test {
 
         // create gov proposal to transfer ownership from the old chief to the guard
         address      usr = address(new SetAuthority());
+        bytes32      tag = extcodehash(usr);
         bytes memory fax = abi.encodeWithSignature("set(address,address)", pause, guard);
-        Proposal proposal = new Proposal(pause, usr, fax);
+
+        Proposal proposal = new Proposal(pause, usr, tag, fax);
 
         // check that the old chief is the authority
         assertEq(address(pause.authority()), address(oldChief));
@@ -261,13 +270,13 @@ contract UpgradeChief is Test {
 
         // plot plan to transfer ownership from old chief to guard
         uint eta;
-        (usr, fax, eta) = proposal.plot();
+        (usr, tag, fax, eta) = proposal.plot();
 
         // wait until delay is passed
         hevm.warp(eta);
 
         // execute ownership transfer from old chief to guard
-        pause.exec(usr, fax, eta);
+        pause.exec(usr, tag, fax, eta);
 
         // check that the guard is the authority
         assertEq(address(pause.authority()), address(guard));
@@ -280,13 +289,13 @@ contract UpgradeChief is Test {
         hevm.warp(lockGuardUntil);
 
         // plot plan to transfer ownership from guard to newChief
-        (usr, fax, eta) = guard.unlock();
+        (usr, tag, fax, eta) = guard.unlock();
 
         // wait until delay has passed
         hevm.warp(eta);
 
         // execute ownership transfer from guard to newChief
-        pause.exec(usr, fax, eta);
+        pause.exec(usr, tag, fax, eta);
 
         // check that the new chief is the authority
         assertEq(address(pause.authority()), address(newChief));

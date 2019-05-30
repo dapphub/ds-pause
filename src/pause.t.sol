@@ -40,14 +40,16 @@ contract Target {
 }
 
 contract Stranger {
-    function plot(DSPause pause, address usr, bytes memory fax, uint eta) public {
-        pause.plot(usr, fax, eta);
+    function plot(DSPause pause, address usr, bytes32 tag, bytes memory fax, uint eta) public {
+        pause.plot(usr, tag, fax, eta);
     }
-    function drop(DSPause pause, address usr, bytes memory fax, uint eta) public {
-        pause.drop(usr, fax, eta);
+    function drop(DSPause pause, address usr, bytes32 tag, bytes memory fax, uint eta) public {
+        pause.drop(usr, tag, fax, eta);
     }
-    function exec(DSPause pause, address usr, bytes memory fax, uint eta) public returns (bytes memory) {
-        return pause.exec(usr, fax, eta);
+    function exec(DSPause pause, address usr, bytes32 tag, bytes memory fax, uint eta)
+        public returns (bytes memory)
+    {
+        return pause.exec(usr, tag, fax, eta);
     }
 }
 
@@ -91,11 +93,15 @@ contract Test is DSTest {
 
     }
 
-    // returns the 1st 32 bytes of data
+    // returns the 1st 32 bytes of data from a bytes array
     function b32(bytes memory data) public pure returns (bytes32 data32) {
         assembly {
             data32 := mload(add(data, 32))
         }
+    }
+
+    function extcodehash(address usr) internal view returns (bytes32 tag) {
+        assembly { tag := extcodehash(usr) }
     }
 }
 
@@ -149,12 +155,13 @@ contract Admin is Test {
 
     function test_set_owner_with_delay() public {
         address      usr = address(new AdminScripts());
+        bytes32      tag = extcodehash(usr);
         bytes memory fax = abi.encodeWithSignature("setOwner(address,address)", pause, 0xdeadbeef);
         uint         eta = now + pause.delay();
 
-        pause.plot(usr, fax, eta);
+        pause.plot(usr, tag, fax, eta);
         hevm.warp(eta);
-        pause.exec(usr, fax, eta);
+        pause.exec(usr, tag, fax, eta);
 
         assertEq(address(pause.owner()), address(0xdeadbeef));
     }
@@ -169,12 +176,13 @@ contract Admin is Test {
         DSAuthority newAuthority = new Authority();
 
         address      usr = address(new AdminScripts());
+        bytes32      tag = extcodehash(usr);
         bytes memory fax = abi.encodeWithSignature("setAuthority(address,address)", pause, newAuthority);
         uint         eta = now + pause.delay();
 
-        pause.plot(usr, fax, eta);
+        pause.plot(usr, tag, fax, eta);
         hevm.warp(eta);
-        pause.exec(usr, fax, eta);
+        pause.exec(usr, tag, fax, eta);
 
         assertEq(address(pause.authority()), address(newAuthority));
     }
@@ -187,12 +195,13 @@ contract Admin is Test {
 
     function test_set_delay_with_delay() public {
         address      usr = address(new AdminScripts());
+        bytes32      tag = extcodehash(usr);
         bytes memory fax = abi.encodeWithSignature("setDelay(address,uint256)", pause, 0);
         uint         eta = now + pause.delay();
 
-        pause.plot(usr, fax, eta);
+        pause.plot(usr, tag, fax, eta);
         hevm.warp(eta);
-        pause.exec(usr, fax, eta);
+        pause.exec(usr, tag, fax, eta);
 
         assertEq(pause.delay(), 0);
     }
@@ -202,28 +211,31 @@ contract Plot is Test {
 
     function testFail_call_from_unauthorized() public {
         address      usr = target;
+        bytes32      tag = extcodehash(usr);
         bytes memory fax = abi.encodeWithSignature("get()");
         uint         eta = now + pause.delay();
 
-        stranger.plot(pause, usr, fax, eta);
+        stranger.plot(pause, usr, tag, fax, eta);
     }
 
     function testFail_plot_eta_too_soon() public {
         address      usr = target;
+        bytes32      tag = extcodehash(usr);
         bytes memory fax = abi.encodeWithSignature("get()");
         uint         eta = now;
 
-        pause.plot(usr, fax, eta);
+        pause.plot(usr, tag, fax, eta);
     }
 
     function test_plot_populates_plans_mapping() public {
         address      usr = target;
+        bytes32      tag = extcodehash(usr);
         bytes memory fax = abi.encodeWithSignature("get()");
         uint         eta = now + pause.delay();
 
-        pause.plot(usr, fax, eta);
+        pause.plot(usr, tag, fax, eta);
 
-        bytes32 id = keccak256(abi.encode(usr, fax, eta));
+        bytes32 id = keccak256(abi.encode(usr, tag, fax, eta));
         assertTrue(pause.plans(id));
     }
 
@@ -233,67 +245,84 @@ contract Exec is Test {
 
     function testFail_delay_not_passed() public {
         address      usr = target;
+        bytes32      tag = extcodehash(usr);
         bytes memory fax = abi.encode(0);
         uint         eta = now + pause.delay();
 
-        pause.plot(usr, fax, eta);
-        pause.exec(usr, fax, eta);
+        pause.plot(usr, tag, fax, eta);
+        pause.exec(usr, tag, fax, eta);
     }
 
     function testFail_double_execution() public {
         address      usr = target;
+        bytes32      tag = extcodehash(usr);
         bytes memory fax = abi.encodeWithSignature("get()");
         uint         eta = now + pause.delay();
 
-        pause.plot(usr, fax, eta);
+        pause.plot(usr, tag, fax, eta);
         hevm.warp(eta);
-        pause.exec(usr, fax, eta);
-        pause.exec(usr, fax, eta);
+        pause.exec(usr, tag, fax, eta);
+        pause.exec(usr, tag, fax, eta);
+    }
+
+    function testFail_tag_mismatch() public {
+        address      usr = target;
+        bytes32      tag = bytes32("INCORRECT_CODEHASH");
+        bytes memory fax = abi.encodeWithSignature("get()");
+        uint         eta = now + pause.delay();
+
+        pause.plot(usr, tag, fax, eta);
+        hevm.warp(eta);
+        pause.exec(usr, tag, fax, eta);
     }
 
     function testFail_exec_plan_with_proxy_ownership_change() public {
         address      usr = target;
+        bytes32      tag = extcodehash(usr);
         bytes memory fax = abi.encodeWithSignature("give(address)", address(this));
         uint         eta = now + pause.delay();
 
-        pause.plot(usr, fax, eta);
+        pause.plot(usr, tag, fax, eta);
         hevm.warp(eta);
-        pause.exec(usr, fax, eta);
+        pause.exec(usr, tag, fax, eta);
     }
 
     function test_suceeds_when_delay_passed() public {
         address      usr = target;
+        bytes32      tag = extcodehash(usr);
         bytes memory fax = abi.encodeWithSignature("get()");
         uint         eta = now + pause.delay();
 
-        pause.plot(usr, fax, eta);
+        pause.plot(usr, tag, fax, eta);
         hevm.warp(eta);
-        bytes memory out = pause.exec(usr, fax, eta);
+        bytes memory out = pause.exec(usr, tag, fax, eta);
 
         assertEq(b32(out), bytes32("Hello"));
     }
 
     function test_suceeds_when_called_from_unauthorized() public {
         address      usr = target;
+        bytes32      tag = extcodehash(usr);
         bytes memory fax = abi.encodeWithSignature("get()");
         uint         eta = now + pause.delay();
 
-        pause.plot(usr, fax, eta);
+        pause.plot(usr, tag, fax, eta);
         hevm.warp(eta);
 
-        bytes memory out = stranger.exec(pause, usr, fax, eta);
+        bytes memory out = stranger.exec(pause, usr, tag, fax, eta);
         assertEq(b32(out), bytes32("Hello"));
     }
 
     function test_suceeds_when_called_from_authorized() public {
         address      usr = target;
+        bytes32      tag = extcodehash(usr);
         bytes memory fax = abi.encodeWithSignature("get()");
         uint         eta = now + pause.delay();
 
-        pause.plot(usr, fax, eta);
+        pause.plot(usr, tag, fax, eta);
         hevm.warp(eta);
 
-        bytes memory out = pause.exec(usr, fax, eta);
+        bytes memory out = pause.exec(usr, tag, fax, eta);
         assertEq(b32(out), bytes32("Hello"));
     }
 
@@ -303,26 +332,28 @@ contract Drop is Test {
 
     function testFail_call_from_unauthorized() public {
         address      usr = target;
+        bytes32      tag = extcodehash(usr);
         bytes memory fax = abi.encodeWithSignature("get()");
         uint         eta = now + pause.delay();
 
-        pause.plot(usr, fax, eta);
+        pause.plot(usr, tag, fax, eta);
         hevm.warp(eta);
 
-        stranger.drop(pause, usr, fax, eta);
+        stranger.drop(pause, usr, tag, fax, eta);
     }
 
     function test_drop_plotted_plan() public {
         address      usr = target;
+        bytes32      tag = extcodehash(usr);
         bytes memory fax = abi.encodeWithSignature("get()");
         uint         eta = now + pause.delay();
 
-        pause.plot(usr, fax, eta);
+        pause.plot(usr, tag, fax, eta);
 
         hevm.warp(eta);
-        pause.drop(usr, fax, eta);
+        pause.drop(usr, tag, fax, eta);
 
-        bytes32 id = keccak256(abi.encode(usr, fax, eta));
+        bytes32 id = keccak256(abi.encode(usr, tag, fax, eta));
         assertTrue(!pause.plans(id));
     }
 

@@ -60,36 +60,44 @@ contract DSPause is DSAuth, DSNote {
 
     // --- util ---
 
-    function hash(address usr, bytes memory fax, uint eta)
+    function hash(address usr, bytes32 tag, bytes memory fax, uint eta)
         internal pure
         returns (bytes32)
     {
-        return keccak256(abi.encode(usr, fax, eta));
+        return keccak256(abi.encode(usr, tag, fax, eta));
+    }
+
+    function soul(address usr)
+        internal view
+        returns (bytes32 tag)
+    {
+        assembly { tag := extcodehash(usr) }
     }
 
     // --- operations ---
 
-    function plot(address usr, bytes memory fax, uint eta)
+    function plot(address usr, bytes32 tag, bytes memory fax, uint eta)
         public note auth
     {
         require(eta >= add(now, delay), "ds-pause-delay-not-respected");
-        plans[hash(usr, fax, eta)] = true;
+        plans[hash(usr, tag, fax, eta)] = true;
     }
 
-    function drop(address usr, bytes memory fax, uint eta)
+    function drop(address usr, bytes32 tag, bytes memory fax, uint eta)
         public note auth
     {
-        plans[hash(usr, fax, eta)] = false;
+        plans[hash(usr, tag, fax, eta)] = false;
     }
 
-    function exec(address usr, bytes memory fax, uint eta)
+    function exec(address usr, bytes32 tag, bytes memory fax, uint eta)
         public note
         returns (bytes memory out)
     {
-        require(now >= eta,                 "ds-pause-premature-exec");
-        require(plans[hash(usr, fax, eta)], "ds-pause-unplotted-plan");
+        require(plans[hash(usr, tag, fax, eta)], "ds-pause-unplotted-plan");
+        require(soul(usr) == tag,                "ds-pause-wrong-codehash");
+        require(now >= eta,                      "ds-pause-premature-exec");
 
-        plans[hash(usr, fax, eta)] = false;
+        plans[hash(usr, tag, fax, eta)] = false;
 
         out = proxy.exec(usr, fax);
         require(proxy.owner() == address(this), "ds-pause-illegal-storage-change");

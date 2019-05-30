@@ -18,6 +18,7 @@ cannot be executed.
 A `plan` consists of:
 
 - `usr`: address to `delegatecall` into
+- `tag`: the expected codehash of `usr`
 - `fax`: `calldata` to use
 - `eta`: first possible (unix) time of execution
 
@@ -51,6 +52,7 @@ to security@dapp.org.
 **`exec`**
 - A `plan` can only be executed if it has previously been plotted
 - A `plan` can only be executed once it's `eta` has passed
+- A `plan` can only be executed if its `tag` matches `extcodehash(usr)`
 - A `plan` can only be executed once
 - A `plan` can be executed by anyone
 
@@ -81,17 +83,18 @@ DSPause pause = new DSPause(delay, owner, authority);
 // plot the plan
 
 address      usr = address(0x0);
+bytes32      tag;  assembly { tag := extcodehash(usr) }
 bytes memory fax = abi.encodeWithSignature("sig()");
 uint         eta = now + delay;
 
-pause.plot(usr, fax, eta);
+pause.plot(usr, tag, fax, eta);
 ```
 
 ```solidity
 // wait until block.timestamp is at least now + delay...
 // and then execute the plan
 
-bytes memory out = pause.exec(usr, fax, eta);
+bytes memory out = pause.exec(usr, tag, fax, eta);
 ```
 
 ## Tests

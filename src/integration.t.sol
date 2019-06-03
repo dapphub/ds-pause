@@ -204,13 +204,15 @@ contract SetAuthority {
     }
 }
 
-// Temporary DSAuthority that will block access to the pause until a
-// prespecified wait period has elapsed.
+// Temporary DSAuthority that will give a DSChief authority over a pause only
+// when a prespecified amount of MKR has been locked in the new chief
 contract Guard is DSAuthority {
     // --- data ---
-    DSPause     public pause;
-    DSAuthority public next; // new authority
-    uint        public when; // locked until
+    DSPause public pause;
+    DSChief public scion; // new chief
+    uint    public limit; // min locked MKR in new chief
+
+    bool public thawed = false;
 
     address public usr;
     bytes32 public tag;
@@ -219,14 +221,14 @@ contract Guard is DSAuthority {
 
     // --- init ---
 
-    constructor(DSPause pause_, uint when_, DSAuthority next_) public {
+    constructor(DSPause pause_, DSChief scion_, uint limit_) public {
         pause = pause_;
-        when = when_;
-        next = next_;
+        scion = scion_;
+        limit = limit_;
 
         usr = address(new SetAuthority());
         tag = extcodehash(usr);
-        fax = abi.encodeWithSignature( "set(address,address)", pause, next);
+        fax = abi.encodeWithSignature( "set(address,address)", pause, scion);
     }
 
     // --- auth ---
@@ -241,20 +243,23 @@ contract Guard is DSAuthority {
     // --- unlock ---
 
     function thaw() external {
-        require(now >= when);
+        require(scion.GOV().balanceOf(address(scion)) >= limit);
+        require(!thawed);
+        thawed = true;
 
         eta = now + pause.delay();
         pause.plot(usr, tag, fax, eta);
     }
 
     function free() external returns (bytes memory) {
+        require(thawed);
         return pause.exec(usr, tag, fax, eta);
     }
 
     // --- util ---
 
-    function extcodehash(address usr) internal view returns (bytes32 tag) {
-        assembly { tag := extcodehash(usr) }
+    function extcodehash(address who) internal view returns (bytes32 soul) {
+        assembly { soul := extcodehash(who) }
     }
 }
 
@@ -274,8 +279,7 @@ contract UpgradeChief is Test {
         DSChief newChief = chiefFab.newChief(gov, maxSlateSize);
 
         // create guard
-        uint until = now + pause.delay() + 100 days;
-        Guard guard = new Guard(pause, until, newChief);
+        Guard guard = new Guard(pause, newChief, votes);
 
         // create gov proposal to transfer ownership from the old chief to the guard
         address      usr = address(new SetAuthority());
@@ -303,9 +307,6 @@ contract UpgradeChief is Test {
         // move MKR from old chief to new chief
         voter.free(oldChief, votes);
         voter.lock(newChief, votes);
-
-        // wait until unlock period has passed
-        hevm.warp(until);
 
         // plot plan to transfer ownership from guard to newChief
         guard.thaw();

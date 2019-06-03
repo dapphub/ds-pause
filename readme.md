@@ -6,6 +6,10 @@ ds-pause
 <i><code>delegatecall</code> based proxy with an enforced delay</i>
 </p>
 
+`ds-pause` allows authorized users to schedule function calls that can only be executed once some
+predetermined waiting period has elapsed. The configurable `delay` attribute sets the minimum wait
+time.
+
 `ds-pause` is designed to be used as a component in a governance system, to give affected parties
 time to respond to decisions. If those affected by governance decisions have e.g. exit or veto
 rights, then the pause can serve as an effective check on governance power.

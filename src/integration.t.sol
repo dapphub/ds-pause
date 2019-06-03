@@ -30,10 +30,6 @@ contract Hevm {
     function warp(uint) public;
 }
 
-contract ProposalLike {
-    function plot() public returns (bytes memory);
-}
-
 contract Voter {
     function vote(DSChief chief, address proposal) public {
         address[] memory votes = new address[](1);
@@ -79,27 +75,33 @@ contract Target {
 // ------------------------------------------------------------------
 
 contract Proposal {
-    bool done = false;
+    bool public plotted  = false;
 
-    DSPause pause;
-    address usr;
-    bytes32 tag;
-    bytes   fax;
+    DSPause public pause;
+    address public usr;
+    bytes32 public tag;
+    bytes   public fax;
+    uint    public eta;
 
     constructor(DSPause pause_, address usr_, bytes32 tag_, bytes memory fax_) public {
         pause = pause_;
         tag = tag_;
         usr = usr_;
         fax = fax_;
+        eta = 0;
     }
 
-    function plot() public returns (address, bytes32, bytes memory, uint) {
-        require(!done);
-        done = true;
+    function plot() external {
+        require(!plotted);
+        plotted = true;
 
-        uint eta = now + pause.delay();
+        eta = now + pause.delay();
         pause.plot(usr, tag, fax, eta);
-        return (usr, tag, fax, eta);
+    }
+
+    function exec() external returns (bytes memory) {
+        require(plotted);
+        return pause.exec(usr, tag, fax, eta);
     }
 }
 
@@ -178,16 +180,15 @@ contract Voting is Test {
         voter.vote(chief, address(proposal));
         voter.lift(chief, address(proposal));
 
-        // execute proposal (plot plan)
-        uint eta;
-        (usr, tag, fax, eta) = proposal.plot();
+        // schedule proposal
+        proposal.plot();
 
         // wait until eta
-        hevm.warp(eta);
+        hevm.warp(proposal.eta());
 
-        // execute action
+        // execute proposal
         assertEq(target.val(), 0);
-        pause.exec(usr, tag, fax, eta);
+        proposal.exec();
         assertEq(target.val(), 1);
     }
 
@@ -203,16 +204,32 @@ contract SetAuthority {
     }
 }
 
+// Temporary DSAuthority that will block access to the pause until a
+// prespecified wait period has elapsed.
 contract Guard is DSAuthority {
-    uint lockUntil;
-    address newAuthority;
-    DSPause pause;
+    // --- data ---
+    DSPause     public pause;
+    DSAuthority public next; // new authority
+    uint        public when; // locked until
 
-    constructor(uint lockUntil_, DSPause pause_, address newAuthority_) public {
-        lockUntil = lockUntil_;
-        newAuthority = newAuthority_;
+    address public usr;
+    bytes32 public tag;
+    bytes   public fax;
+    uint    public eta;
+
+    // --- init ---
+
+    constructor(DSPause pause_, uint when_, DSAuthority next_) public {
         pause = pause_;
+        when = when_;
+        next = next_;
+
+        usr = address(new SetAuthority());
+        tag = extcodehash(usr);
+        fax = abi.encodeWithSignature( "set(address,address)", pause, next);
     }
+
+    // --- auth ---
 
     function canCall(address src, address dst, bytes4 sig) public view returns (bool) {
         require(src == address(this));
@@ -221,16 +238,23 @@ contract Guard is DSAuthority {
         return true;
     }
 
-    function unlock() public returns (address, bytes32, bytes memory, uint) {
-        require(now >= lockUntil);
+    // --- unlock ---
 
-        address      usr = address(new SetAuthority());
-        bytes32      tag;  assembly { tag := extcodehash(usr) }
-        bytes memory fax = abi.encodeWithSignature( "set(address,address)", pause, newAuthority);
-        uint         eta = now + pause.delay();
+    function thaw() external {
+        require(now >= when);
 
+        eta = now + pause.delay();
         pause.plot(usr, tag, fax, eta);
-        return (usr, tag, fax, eta);
+    }
+
+    function free() external returns (bytes memory) {
+        return pause.exec(usr, tag, fax, eta);
+    }
+
+    // --- util ---
+
+    function extcodehash(address usr) internal view returns (bytes32 tag) {
+        assembly { tag := extcodehash(usr) }
     }
 }
 
@@ -250,8 +274,8 @@ contract UpgradeChief is Test {
         DSChief newChief = chiefFab.newChief(gov, maxSlateSize);
 
         // create guard
-        uint lockGuardUntil = now + pause.delay() + 100 days;
-        Guard guard = new Guard(lockGuardUntil, pause, address(newChief));
+        uint until = now + pause.delay() + 100 days;
+        Guard guard = new Guard(pause, until, newChief);
 
         // create gov proposal to transfer ownership from the old chief to the guard
         address      usr = address(new SetAuthority());
@@ -268,15 +292,10 @@ contract UpgradeChief is Test {
         voter.vote(oldChief, address(proposal));
         voter.lift(oldChief, address(proposal));
 
-        // plot plan to transfer ownership from old chief to guard
-        uint eta;
-        (usr, tag, fax, eta) = proposal.plot();
-
-        // wait until delay is passed
-        hevm.warp(eta);
-
-        // execute ownership transfer from old chief to guard
-        pause.exec(usr, tag, fax, eta);
+        // transfer ownership from old chief to guard
+        proposal.plot();
+        hevm.warp(proposal.eta());
+        proposal.exec();
 
         // check that the guard is the authority
         assertEq(address(pause.authority()), address(guard));
@@ -286,16 +305,12 @@ contract UpgradeChief is Test {
         voter.lock(newChief, votes);
 
         // wait until unlock period has passed
-        hevm.warp(lockGuardUntil);
+        hevm.warp(until);
 
         // plot plan to transfer ownership from guard to newChief
-        (usr, tag, fax, eta) = guard.unlock();
-
-        // wait until delay has passed
-        hevm.warp(eta);
-
-        // execute ownership transfer from guard to newChief
-        pause.exec(usr, tag, fax, eta);
+        guard.thaw();
+        hevm.warp(guard.eta());
+        guard.free();
 
         // check that the new chief is the authority
         assertEq(address(pause.authority()), address(newChief));

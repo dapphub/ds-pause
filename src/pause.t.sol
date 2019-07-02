@@ -236,7 +236,7 @@ contract Plot is Test {
         pause.plot(usr, tag, fax, eta);
 
         bytes32 id = keccak256(abi.encode(usr, tag, fax, eta));
-        assertTrue(pause.plans(id));
+        assertEq(pause.plans(id), 1);
     }
 
 }
@@ -354,7 +354,7 @@ contract Drop is Test {
         pause.drop(usr, tag, fax, eta);
 
         bytes32 id = keccak256(abi.encode(usr, tag, fax, eta));
-        assertTrue(!pause.plans(id));
+        assertEq(pause.plans(id), 0);
     }
 
 }

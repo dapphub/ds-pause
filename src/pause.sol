@@ -51,7 +51,7 @@ contract DSPause is DSAuth, DSNote {
 
     // --- data ---
 
-    mapping (bytes32 => bool) public plans;
+    mapping (bytes32 => uint) public plans;
     DSPauseProxy public proxy;
     uint         public delay;
 
@@ -70,13 +70,13 @@ contract DSPause is DSAuth, DSNote {
         external note auth
     {
         require(eta >= add(now, delay), "ds-pause-delay-not-respected");
-        plans[keccak256(abi.encode(usr, tag, fax, eta))] = true;
+        plans[keccak256(abi.encode(usr, tag, fax, eta))] = 1;
     }
 
     function drop(address usr, bytes32 tag, bytes calldata fax, uint eta)
         external note auth
     {
-        plans[keccak256(abi.encode(usr, tag, fax, eta))] = false;
+        plans[keccak256(abi.encode(usr, tag, fax, eta))] = 0;
     }
 
     function exec(address usr, bytes32 tag, bytes calldata fax, uint eta)
@@ -85,11 +85,11 @@ contract DSPause is DSAuth, DSNote {
     {
         bytes32 id = keccak256(abi.encode(usr, tag, fax, eta));
 
-        require(plans[id],        "ds-pause-unplotted-plan");
         require(now >= eta,       "ds-pause-premature-exec");
+        require(plans[id] == 1,   "ds-pause-unplotted-plan");
         require(soul(usr) == tag, "ds-pause-wrong-codehash");
 
-        plans[id] = false;
+        plans[id] = 0;
 
         out = proxy.exec(usr, fax);
         require(proxy.owner() == address(this), "ds-pause-illegal-storage-change");

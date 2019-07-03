@@ -16,23 +16,21 @@
 pragma solidity >=0.5.0 <0.6.0;
 
 import {DSNote} from "ds-note/note.sol";
-import {DSAuth, DSAuthority} from "ds-auth/auth.sol";
 
-contract DSPause is DSAuth, DSNote {
+contract DSPause is DSNote {
+
+    // --- auth ---
+
+    mapping (address => uint) public wards;
+    function rely(address usr) public note wait { wards[usr] = 1; }
+    function deny(address usr) public note wait { wards[usr] = 0; }
+
+    modifier auth { require(wards[msg.sender] == 1,       "ds-pause-not-authorized"); _; }
+    modifier wait { require(msg.sender == address(proxy), "ds-pause-undelayed-call"); _; }
 
     // --- admin ---
 
-    modifier wait { require(msg.sender == address(proxy), "ds-pause-undelayed-call"); _; }
-
-    function setOwner(address owner_) public wait {
-        owner = owner_;
-        emit LogSetOwner(owner);
-    }
-    function setAuthority(DSAuthority authority_) public wait {
-        authority = authority_;
-        emit LogSetAuthority(address(authority));
-    }
-    function setDelay(uint delay_) public note wait {
+    function file(uint delay_) public note wait {
         delay = delay_;
     }
 
@@ -40,7 +38,7 @@ contract DSPause is DSAuth, DSNote {
 
     function add(uint x, uint y) internal pure returns (uint z) {
         z = x + y;
-        require(z >= x, "ds-pause-addition-overflow");
+        require(z >= x, "ds-pause-overflow");
     }
 
     // --- util ---
@@ -57,10 +55,9 @@ contract DSPause is DSAuth, DSNote {
 
     // --- init ---
 
-    constructor(uint delay_, address owner_, DSAuthority authority_) public {
+    constructor(uint delay_) public {
         delay = delay_;
-        owner = owner_;
-        authority = authority_;
+        wards[msg.sender] = 1;
         proxy = new DSPauseProxy();
     }
 
@@ -100,7 +97,7 @@ contract DSPause is DSAuth, DSNote {
 // malicious storage modification during plan execution
 contract DSPauseProxy {
     address public owner;
-    modifier auth { require(msg.sender == owner, "ds-pause-proxy-unauthorized"); _; }
+    modifier auth { require(msg.sender == owner, "ds-pause-proxy-not-authorized"); _; }
     constructor() public { owner = msg.sender; }
 
     function exec(address usr, bytes memory fax)

@@ -15,7 +15,7 @@
 
 pragma solidity >=0.5.0 <0.6.0;
 
-import {DSNote} from "ds-note/note.sol";
+import {DSNote} from "./lib.sol";
 
 contract DSPause is DSNote {
 
@@ -30,9 +30,15 @@ contract DSPause is DSNote {
 
     // --- admin ---
 
-    function file(uint delay_) public note wait {
-        delay = delay_;
+    function file(uint data) external note wait {
+        delay = data;
     }
+
+    // --- logs ---
+
+    event Plot(address usr, bytes32 tag, bytes fax, uint eta);
+    event Drop(address usr, bytes32 tag, bytes fax, uint eta);
+    event Exec(address usr, bytes32 tag, bytes fax, uint eta);
 
     // --- math ---
 
@@ -68,12 +74,14 @@ contract DSPause is DSNote {
     {
         require(eta >= add(now, delay), "ds-pause-delay-not-respected");
         plans[keccak256(abi.encode(usr, tag, fax, eta))] = 1;
+        emit Plot(usr, tag, fax, eta);
     }
 
     function drop(address usr, bytes32 tag, bytes calldata fax, uint eta)
         external note auth
     {
         plans[keccak256(abi.encode(usr, tag, fax, eta))] = 0;
+        emit Drop(usr, tag, fax, eta);
     }
 
     function exec(address usr, bytes32 tag, bytes calldata fax, uint eta)
@@ -87,9 +95,10 @@ contract DSPause is DSNote {
         require(soul(usr) == tag, "ds-pause-wrong-codehash");
 
         plans[id] = 0;
-
         out = proxy.exec(usr, fax);
-        require(proxy.owner() == address(this), "ds-pause-illegal-storage-change");
+
+        require(proxy.owner() == address(this), "ds-pause-proxy-stolen");
+        emit Exec(usr, tag, fax, eta);
     }
 }
 
@@ -100,8 +109,8 @@ contract DSPauseProxy {
     modifier auth { require(msg.sender == owner, "ds-pause-proxy-not-authorized"); _; }
     constructor() public { owner = msg.sender; }
 
-    function exec(address usr, bytes memory fax)
-        public auth
+    function exec(address usr, bytes calldata fax)
+        external auth
         returns (bytes memory out)
     {
         bool ok;

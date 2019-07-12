@@ -272,6 +272,32 @@ iff
 
 #### `plot`
 
+```act
+behaviour plot of DSPause
+interface plot(address usr, bytes32 tag, bytes fax, uint eta)
+
+types
+
+  Delay: uint256
+
+storage
+
+  delay |-> Delay
+  plans[#hash(usr, tag, fax, eta)] |-> Plotted => 1
+
+iff in range uint256
+
+  TIME + Delay
+
+iff
+
+  VCallValue == 0
+
+if
+
+  sizeWordStackAux(fax, 0) <= 100
+```
+
 #### `drop`
 
 #### `exec`

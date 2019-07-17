@@ -283,6 +283,7 @@ types
 storage
 
   delay |-> Delay
+  wards[CALLER_ID] |-> Can
   plans[#hash(usr, tag, fax, eta)] |-> Plotted => 1
 
 iff in range uint256
@@ -291,11 +292,15 @@ iff in range uint256
 
 iff
 
+  Can == 1
   VCallValue == 0
+  eta >= TIME + Delay
 
 if
 
-  sizeWordStackAux(fax, 0) <= 100
+  sizeWordStackAux(fax, 0) <= 128
+  (4 + (sizeWordStackAux((fax ++ (#padToWidth((#ceil32(sizeWordStackAux(fax, 0)) - sizeWordStackAux(fax, 0)), .WordStack) ++ CD)), 0) + 160)) < pow256
+  (164 + sizeWordStackAux(fax, 0)) <= (4 + (sizeWordStackAux((fax ++ (#padToWidth((#ceil32(sizeWordStackAux(fax, 0)) - sizeWordStackAux(fax, 0)), .WordStack) ++ CD)), 0) + 160))
 ```
 
 #### `drop`

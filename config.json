@@ -10,7 +10,7 @@
   },
   "implementations": {
     "DSPause": {
-      "solc_output": "out/pause.sol.json"
+      "src": "src/pause.sol"
     }
   },
   "dapp_root": "."

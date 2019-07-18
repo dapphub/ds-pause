@@ -1,7 +1,7 @@
 {
   "name": "ds-pause",
   "src": {
-    "specification": "readme.md",
+    "specification": "spec/spec.act.md",
     "smt_prelude": "spec/prelude.smt2.md",
     "rules": [
       "spec/lemmas.k.md"

@@ -61,8 +61,3 @@ rule (((164 +Int sizeWordStackAux(F, 0)) <=Int chop((4 +Int (sizeWordStackAux((F
   requires #sizeWordStack(F) <Int 64
   andBool #sizeWordStack(C) <Int 64
 ```
-
-
-
-
-

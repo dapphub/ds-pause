@@ -4,7 +4,6 @@
     "specification": "readme.md",
     "smt_prelude": "spec/prelude.smt2.md",
     "rules": [
-      "spec/storage.k.md",
       "spec/lemmas.k.md"
     ]
   },

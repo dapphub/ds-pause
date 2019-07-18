@@ -298,9 +298,8 @@ iff
 
 if
 
-  sizeWordStackAux(fax, 0) <= 128
-  (4 + (sizeWordStackAux((fax ++ (#padToWidth((#ceil32(sizeWordStackAux(fax, 0)) - sizeWordStackAux(fax, 0)), .WordStack) ++ CD)), 0) + 160)) < pow256
-  (164 + sizeWordStackAux(fax, 0)) <= (4 + (sizeWordStackAux((fax ++ (#padToWidth((#ceil32(sizeWordStackAux(fax, 0)) - sizeWordStackAux(fax, 0)), .WordStack) ++ CD)), 0) + 160))
+  #sizeWordStack(fax) <Int 64
+  #sizeWordStack(CD) <Int 64
 ```
 
 #### `drop`

@@ -184,8 +184,8 @@ iff
 
 if
 
-  #sizeWordStack(fax) <Int 64
-  #sizeWordStack(CD) <Int 64
+  #sizeWordStack(fax) < 64
+  #sizeWordStack(CD) < 64
 ```
 
 ### `drop`

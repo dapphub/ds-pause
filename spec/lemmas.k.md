@@ -53,11 +53,19 @@ both `chop` and `#ceil32` are `[concrete]` and so cannot be rewritten if they ha
 as their arguments.
 
 ```k
-rule ((164 <=Int chop((4 +Int (sizeWordStackAux((F ++ (#padToWidth((#ceil32(sizeWordStackAux(F, 0)) -Int sizeWordStackAux(F, 0)), .WordStack) ++ C)), 0) +Int 160))))) => true
+rule ((164 <=Int chop((
+    4
+    +Int (sizeWordStackAux((F ++ (#padToWidth((#ceil32(sizeWordStackAux(F, 0)) -Int sizeWordStackAux(F, 0)), .WordStack) ++ C)), 0)
+    +Int 160)
+  )))) => true
   requires #sizeWordStack(F) <Int 64
-  andBool #sizeWordStack(C) <Int 64
+   andBool #sizeWordStack(C) <Int 64
 
-rule (((164 +Int sizeWordStackAux(F, 0)) <=Int chop((4 +Int (sizeWordStackAux((F ++ (#padToWidth((#ceil32(sizeWordStackAux(F, 0)) -Int sizeWordStackAux(F, 0)), .WordStack) ++ C)), 0) +Int 160))))) => true
+rule (((164 +Int sizeWordStackAux(F, 0)) <=Int chop((
+    4
+    +Int (sizeWordStackAux((F ++ (#padToWidth((#ceil32(sizeWordStackAux(F, 0)) -Int sizeWordStackAux(F, 0)), .WordStack) ++ C)), 0)
+    +Int 160)
+  )))) => true
   requires #sizeWordStack(F) <Int 64
-  andBool #sizeWordStack(C) <Int 64
+   andBool #sizeWordStack(C) <Int 64
 ```

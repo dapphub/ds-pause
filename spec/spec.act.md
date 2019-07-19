@@ -164,7 +164,9 @@ interface plot(address usr, bytes32 tag, bytes fax, uint eta)
 
 types
 
+  Can: uint256
   Delay: uint256
+  Plotted: uint256
 
 storage
 

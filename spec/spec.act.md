@@ -184,14 +184,10 @@ iff
   VCallValue == 0
   eta >= TIME + Delay
 
-gas
-
-  3000000 + (((#memoryUsageUpdate(10, 320, num(sizeWordStackAux(ABI_fax, 0))) * 3) + ((#memoryUsageUpdate(10, 320, num(sizeWordStackAux(ABI_fax, 0))) * #memoryUsageUpdate(10, 320, num(sizeWordStackAux(ABI_fax, 0)))) / 512)) - 30)
-
 if
 
-  #sizeWordStack(fax) < 64
-  #sizeWordStack(CD) < 64
+  sizeWordStackAux(fax, 0) ==Int 64
+  sizeWordStackAux(CD, 0) ==Int 64
 ```
 
 ### `drop`

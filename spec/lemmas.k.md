@@ -46,26 +46,18 @@ calldata for `plot` / `drop` / `exec` is layed out as follows:
 1. `symbolic` : `padding for fax (to word boundry, max 31 bytes)`
 1. `symbolic` : `excess calldata (CD)`
 
-## Size
+## Size Calculations
 
 These lemmas help `K` simplify terms that make calculations about calldata size. They are required as
 both `chop` and `#ceil32` are `[concrete]` and so cannot be rewritten if they have symbolic values
 as their arguments.
 
 ```k
-rule ((164 <=Int chop((
-    4
-    +Int (sizeWordStackAux((F ++ (#padToWidth((#ceil32(sizeWordStackAux(F, 0)) -Int sizeWordStackAux(F, 0)), .WordStack) ++ C)), 0)
-    +Int 160)
-  )))) => true
+rule ((164 <=Int chop((4 +Int (sizeWordStackAux((F ++ (#padToWidth((#ceil32(sizeWordStackAux(F, 0)) -Int sizeWordStackAux(F, 0)), .WordStack) ++ C)), 0) +Int 160))))) => true
   requires #sizeWordStack(F) <Int 64
    andBool #sizeWordStack(C) <Int 64
 
-rule (((164 +Int sizeWordStackAux(F, 0)) <=Int chop((
-    4
-    +Int (sizeWordStackAux((F ++ (#padToWidth((#ceil32(sizeWordStackAux(F, 0)) -Int sizeWordStackAux(F, 0)), .WordStack) ++ C)), 0)
-    +Int 160)
-  )))) => true
+rule (((164 +Int sizeWordStackAux(F, 0)) <=Int chop((4 +Int (sizeWordStackAux((F ++ (#padToWidth((#ceil32(sizeWordStackAux(F, 0)) -Int sizeWordStackAux(F, 0)), .WordStack) ++ C)), 0) +Int 160))))) => true
   requires #sizeWordStack(F) <Int 64
    andBool #sizeWordStack(C) <Int 64
 ```

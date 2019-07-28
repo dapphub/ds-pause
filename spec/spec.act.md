@@ -186,8 +186,8 @@ iff
 
 if
 
-  sizeWordStackAux(fax, 0) ==Int 64
-  sizeWordStackAux(CD, 0) ==Int 64
+  sizeWordStackAux(fax, 0) == 64
+  sizeWordStackAux(CD, 0) == 64
 ```
 
 ### `drop`

@@ -24,7 +24,7 @@ A `plan` consists of:
 - `usr`: address to `delegatecall` into
 - `tag`: the expected codehash of `usr`
 - `fax`: `calldata` to use
-- `eta`: first possible (unix) time of execution
+- `eta`: first possible time of execution (as seconds since unix epoch)
 
 Each plan has a unique id, defined as `keccack256(abi.encode(usr, tag, fax, eta))`
 

@@ -22,7 +22,7 @@ contract DSPause is DSAuth, DSNote {
 
     // --- admin ---
 
-    modifier wait { require(msg.sender == address(proxy), "ds-pause-undelayed-call"); _; }
+    modifier wait { require(msg.sender == address(this), "ds-pause-undelayed-call"); _; }
 
     function setOwner(address owner_) public wait {
         owner = owner_;
@@ -45,9 +45,8 @@ contract DSPause is DSAuth, DSNote {
 
     // --- data ---
 
+    uint public delay;
     mapping (bytes32 => bool) public plans;
-    DSPauseProxy public proxy;
-    uint         public delay;
 
     // --- init ---
 
@@ -55,7 +54,6 @@ contract DSPause is DSAuth, DSNote {
         delay = delay_;
         owner = owner_;
         authority = authority_;
-        proxy = new DSPauseProxy();
     }
 
     // --- util ---
@@ -99,22 +97,6 @@ contract DSPause is DSAuth, DSNote {
 
         plans[hash(usr, tag, fax, eta)] = false;
 
-        out = proxy.exec(usr, fax);
-        require(proxy.owner() == address(this), "ds-pause-illegal-storage-change");
-    }
-}
-
-// plans are executed in an isolated storage context to protect the pause from
-// malicious storage modification during plan execution
-contract DSPauseProxy {
-    address public owner;
-    modifier auth { require(msg.sender == owner, "ds-pause-proxy-unauthorized"); _; }
-    constructor() public { owner = msg.sender; }
-
-    function exec(address usr, bytes memory fax)
-        public auth
-        returns (bytes memory out)
-    {
         bool ok;
         (ok, out) = usr.delegatecall(fax);
         require(ok, "ds-pause-delegatecall-error");

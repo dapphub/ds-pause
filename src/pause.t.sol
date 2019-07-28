@@ -276,17 +276,6 @@ contract Exec is Test {
         pause.exec(usr, tag, fax, eta);
     }
 
-    function testFail_exec_plan_with_proxy_ownership_change() public {
-        address      usr = target;
-        bytes32      tag = extcodehash(usr);
-        bytes memory fax = abi.encodeWithSignature("give(address)", address(this));
-        uint         eta = now + pause.delay();
-
-        pause.plot(usr, tag, fax, eta);
-        hevm.warp(eta);
-        pause.exec(usr, tag, fax, eta);
-    }
-
     function test_suceeds_when_delay_passed() public {
         address      usr = target;
         bytes32      tag = extcodehash(usr);

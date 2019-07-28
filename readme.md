@@ -26,7 +26,7 @@ A `plan` consists of:
 - `fax`: `calldata` to use
 - `eta`: first possible (unix) time of execution
 
-Each plan has a unique id, defined as `keccack256(abi.encode(usr, fax, eta))`
+Each plan has a unique id, defined as `keccack256(abi.encode(usr, tag, fax, eta))`
 
 ## Operations
 

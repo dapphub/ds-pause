@@ -126,7 +126,7 @@ contract AdminScripts {
 // ------------------------------------------------------------------
 
 contract Constructor is DSTest {
-
+    function setUp() public {}
     function test_delay_set() public {
         DSPause pause = new DSPause(100, address(0x0), new Authority());
         assertEq(pause.delay(), 100);

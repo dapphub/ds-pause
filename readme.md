@@ -41,11 +41,6 @@ Plans can be manipulated in the following ways:
 A break of any of the following would be classified as a critical issue. Please submit bug reports
 to security@dapp.org.
 
-**high level**
-- There is no way to bypass the delay
-- The code executed by the `delegatecall` cannot directly modify storage on the pause
-- The pause will always retain ownership of it's `proxy`
-
 **admin**
 - `authority`, `owner`, and `delay` can only be changed if an authorized user plots a `plan` to do so
 
@@ -63,15 +58,13 @@ to security@dapp.org.
 **`drop`**
 - A `plan` can only be dropped by authorized users
 
-## Identity & Trust
+## Gotchas
 
-In order to protect the internal storage of the pause from malicious writes during `plan` execution,
-we perform the actual `delegatecall` operation in a seperate contract with an isolated storage
-context (`DSPauseProxy`). Each pause has it's own individual `proxy`.
-
-This means that `plan`'s are executed with the identity of the `proxy`, and when integrating the
-pause into some auth scheme, you probably want to trust the pause's `proxy` and not the pause
-itself.
+Plans are executed with `delegatecall`, this means they have full write access to the pause's
+storage. This access can be used to bypass the checks in `plot` and make plans that can be executed
+less than `delay` seconds into the future. Because `plot` is only callable by authorized users, and
+a malicous plan could anyway just take ownership of the pause entirely, it was decided that counter
+measures were not worth the additional complexity.
 
 ## Example Usage
 
@@ -95,8 +88,7 @@ pause.plot(usr, tag, fax, eta);
 ```
 
 ```solidity
-// wait until block.timestamp is at least now + delay...
-// and then execute the plan
+// wait until block.timestamp is at least now + delay and then execute the plan
 
 bytes memory out = pause.exec(usr, tag, fax, eta);
 ```

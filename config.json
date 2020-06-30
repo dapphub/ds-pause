@@ -1,0 +1,16 @@
+{
+  "name": "ds-pause",
+  "src": {
+    "specification": "spec/spec.act.md",
+    "smt_prelude": "spec/prelude.smt2.md",
+    "rules": [
+      "spec/lemmas.k.md"
+    ]
+  },
+  "implementations": {
+    "DSPause": {
+      "src": "src/pause.sol"
+    }
+  },
+  "dapp_root": "."
+}

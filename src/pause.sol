@@ -15,92 +15,90 @@
 
 pragma solidity >=0.5.0 <0.6.0;
 
-import {DSNote} from "ds-note/note.sol";
-import {DSAuth, DSAuthority} from "ds-auth/auth.sol";
+import {DSNote} from "./lib.sol";
 
-contract DSPause is DSAuth, DSNote {
+contract DSPause is DSNote {
+
+    // --- auth ---
+
+    mapping (address => uint) public wards;
+    function rely(address usr) public note wait { wards[usr] = 1; }
+    function deny(address usr) public note wait { wards[usr] = 0; }
+
+    modifier auth { require(wards[msg.sender] == 1,       "ds-pause-not-authorized"); _; }
+    modifier wait { require(msg.sender == address(proxy), "ds-pause-undelayed-call"); _; }
 
     // --- admin ---
 
-    modifier wait { require(msg.sender == address(proxy), "ds-pause-undelayed-call"); _; }
+    function file(uint data) external note wait {
+        delay = data;
+    }
 
-    function setOwner(address owner_) public wait {
-        owner = owner_;
-        emit LogSetOwner(owner);
-    }
-    function setAuthority(DSAuthority authority_) public wait {
-        authority = authority_;
-        emit LogSetAuthority(address(authority));
-    }
-    function setDelay(uint delay_) public note wait {
-        delay = delay_;
-    }
+    // --- logs ---
+
+    event Plot(address usr, bytes32 tag, bytes fax, uint eta);
+    event Drop(address usr, bytes32 tag, bytes fax, uint eta);
+    event Exec(address usr, bytes32 tag, bytes fax, uint eta);
 
     // --- math ---
 
     function add(uint x, uint y) internal pure returns (uint z) {
         z = x + y;
-        require(z >= x, "ds-pause-addition-overflow");
+        require(z >= x, "ds-pause-overflow");
+    }
+
+    // --- util ---
+
+    function soul(address usr) internal view returns (bytes32 tag) {
+        assembly { tag := extcodehash(usr) }
     }
 
     // --- data ---
 
-    mapping (bytes32 => bool) public plans;
+    mapping (bytes32 => uint) public plans;
     DSPauseProxy public proxy;
     uint         public delay;
 
     // --- init ---
 
-    constructor(uint delay_, address owner_, DSAuthority authority_) public {
+    constructor(uint delay_) public {
         delay = delay_;
-        owner = owner_;
-        authority = authority_;
+        wards[msg.sender] = 1;
         proxy = new DSPauseProxy();
-    }
-
-    // --- util ---
-
-    function hash(address usr, bytes32 tag, bytes memory fax, uint eta)
-        internal pure
-        returns (bytes32)
-    {
-        return keccak256(abi.encode(usr, tag, fax, eta));
-    }
-
-    function soul(address usr)
-        internal view
-        returns (bytes32 tag)
-    {
-        assembly { tag := extcodehash(usr) }
     }
 
     // --- operations ---
 
-    function plot(address usr, bytes32 tag, bytes memory fax, uint eta)
-        public note auth
+    function plot(address usr, bytes32 tag, bytes calldata fax, uint eta)
+        external note auth
     {
         require(eta >= add(now, delay), "ds-pause-delay-not-respected");
-        plans[hash(usr, tag, fax, eta)] = true;
+        plans[keccak256(abi.encode(usr, tag, fax, eta))] = 1;
+        emit Plot(usr, tag, fax, eta);
     }
 
-    function drop(address usr, bytes32 tag, bytes memory fax, uint eta)
-        public note auth
+    function drop(address usr, bytes32 tag, bytes calldata fax, uint eta)
+        external note auth
     {
-        plans[hash(usr, tag, fax, eta)] = false;
+        plans[keccak256(abi.encode(usr, tag, fax, eta))] = 0;
+        emit Drop(usr, tag, fax, eta);
     }
 
-    function exec(address usr, bytes32 tag, bytes memory fax, uint eta)
-        public note
+    function exec(address usr, bytes32 tag, bytes calldata fax, uint eta)
+        external note
         returns (bytes memory out)
     {
-        require(plans[hash(usr, tag, fax, eta)], "ds-pause-unplotted-plan");
-        require(soul(usr) == tag,                "ds-pause-wrong-codehash");
-        require(now >= eta,                      "ds-pause-premature-exec");
+        bytes32 id = keccak256(abi.encode(usr, tag, fax, eta));
 
-        plans[hash(usr, tag, fax, eta)] = false;
+        require(now >= eta,       "ds-pause-premature-exec");
+        require(plans[id] == 1,   "ds-pause-unplotted-plan");
+        require(soul(usr) == tag, "ds-pause-wrong-codehash");
 
+        plans[id] = 0;
         out = proxy.exec(usr, fax);
-        require(proxy.owner() == address(this), "ds-pause-illegal-storage-change");
+
+        require(proxy.owner() == address(this), "ds-pause-proxy-stolen");
+        emit Exec(usr, tag, fax, eta);
     }
 }
 
@@ -108,11 +106,11 @@ contract DSPause is DSAuth, DSNote {
 // malicious storage modification during plan execution
 contract DSPauseProxy {
     address public owner;
-    modifier auth { require(msg.sender == owner, "ds-pause-proxy-unauthorized"); _; }
+    modifier auth { require(msg.sender == owner, "ds-pause-proxy-not-authorized"); _; }
     constructor() public { owner = msg.sender; }
 
-    function exec(address usr, bytes memory fax)
-        public auth
+    function exec(address usr, bytes calldata fax)
+        external auth
         returns (bytes memory out)
     {
         bool ok;

@@ -13,19 +13,18 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-pragma solidity >=0.5.0 <0.6.0;
+pragma solidity >=0.6.0;
 
 import {DSTest} from "ds-test/test.sol";
-import {DSAuth, DSAuthority} from "ds-auth/auth.sol";
 
-import {DSPause} from "./pause.sol";
+import "./pause.sol";
 
 // ------------------------------------------------------------------
 // Test Harness
 // ------------------------------------------------------------------
 
-contract Hevm {
-    function warp(uint) public;
+abstract contract Hevm {
+    function warp(uint) public virtual;
 }
 
 contract Target {
@@ -63,6 +62,7 @@ contract Authority is DSAuthority {
     function canCall(address src, address, bytes4)
         public
         view
+        override
         returns (bool)
     {
         require(src == owner);

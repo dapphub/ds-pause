@@ -13,10 +13,42 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-pragma solidity >=0.5.0 <0.6.0;
+pragma solidity >=0.6.0;
 
 import {DSNote} from "ds-note/note.sol";
-import {DSAuth, DSAuthority} from "ds-auth/auth.sol";
+
+interface DSAuthority {
+    function canCall(
+        address src, address dst, bytes4 sig
+    ) external view returns (bool);
+}
+
+contract DSAuthEvents {
+    event LogSetAuthority (address indexed authority);
+    event LogSetOwner     (address indexed owner);
+}
+
+contract DSAuth is DSAuthEvents {
+    DSAuthority  public  authority;
+    address      public  owner;
+
+    modifier auth {
+        require(isAuthorized(msg.sender, msg.sig), "ds-auth-unauthorized");
+        _;
+    }
+
+    function isAuthorized(address src, bytes4 sig) internal view returns (bool) {
+        if (src == address(this)) {
+            return true;
+        } else if (src == owner) {
+            return true;
+        } else if (authority == DSAuthority(0)) {
+            return false;
+        } else {
+            return authority.canCall(src, address(this), sig);
+        }
+    }
+}
 
 contract DSPause is DSAuth, DSNote {
 

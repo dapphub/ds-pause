@@ -13,10 +13,42 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-pragma solidity >=0.5.0 <0.6.0;
+pragma solidity >=0.5.12;
 
 import {DSNote} from "ds-note/note.sol";
-import {DSAuth, DSAuthority} from "ds-auth/auth.sol";
+
+interface DSAuthority {
+    function canCall(
+        address src, address dst, bytes4 sig
+    ) external view returns (bool);
+}
+
+contract DSAuthEvents {
+    event LogSetAuthority (address indexed authority);
+    event LogSetOwner     (address indexed owner);
+}
+
+contract DSAuth is DSAuthEvents {
+    address public  authority;
+    address public  owner;
+
+    modifier auth {
+        require(isAuthorized(msg.sender, msg.sig), "ds-auth-unauthorized");
+        _;
+    }
+
+    function isAuthorized(address src, bytes4 sig) internal view returns (bool) {
+        if (src == address(this)) {
+            return true;
+        } else if (src == owner) {
+            return true;
+        } else if (authority == address(0)) {
+            return false;
+        } else {
+            return DSAuthority(authority).canCall(src, address(this), sig);
+        }
+    }
+}
 
 contract DSPause is DSAuth, DSNote {
 
@@ -28,9 +60,9 @@ contract DSPause is DSAuth, DSNote {
         owner = owner_;
         emit LogSetOwner(owner);
     }
-    function setAuthority(DSAuthority authority_) public wait {
+    function setAuthority(address authority_) public wait {
         authority = authority_;
-        emit LogSetAuthority(address(authority));
+        emit LogSetAuthority(authority);
     }
     function setDelay(uint delay_) public note wait {
         delay = delay_;
@@ -51,7 +83,7 @@ contract DSPause is DSAuth, DSNote {
 
     // --- init ---
 
-    constructor(uint delay_, address owner_, DSAuthority authority_) public {
+    constructor(uint delay_, address owner_, address authority_) public {
         delay = delay_;
         owner = owner_;
         authority = authority_;

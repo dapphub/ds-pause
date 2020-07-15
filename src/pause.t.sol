@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-pragma solidity >=0.6.0;
+pragma solidity >=0.5.12;
 
 import {DSTest} from "ds-test/test.sol";
 
@@ -23,8 +23,8 @@ import "./pause.sol";
 // Test Harness
 // ------------------------------------------------------------------
 
-abstract contract Hevm {
-    function warp(uint) public virtual;
+interface Hevm {
+    function warp(uint) external;
 }
 
 contract Target {
@@ -52,7 +52,7 @@ contract Stranger {
     }
 }
 
-contract Authority is DSAuthority {
+contract Authority {
     address owner;
 
     constructor() public {
@@ -62,7 +62,6 @@ contract Authority is DSAuthority {
     function canCall(address src, address, bytes4)
         public
         view
-        override
         returns (bool)
     {
         require(src == owner);
@@ -88,7 +87,7 @@ contract Test is DSTest {
         stranger = new Stranger();
 
         uint delay = 1 days;
-        pause = new DSPause(delay, address(0x0), new Authority());
+        pause = new DSPause(delay, address(0x0), address(new Authority()));
 
 
     }
@@ -100,7 +99,7 @@ contract Test is DSTest {
         }
     }
 
-    function extcodehash(address usr) internal view returns (bytes32 tag) {
+    function codehash(address usr) internal view returns (bytes32 tag) {
         assembly { tag := extcodehash(usr) }
     }
 }
@@ -116,7 +115,7 @@ contract AdminScripts {
     function setOwner(DSPause pause, address owner) public {
         pause.setOwner(owner);
     }
-    function setAuthority(DSPause pause, DSAuthority authority) public {
+    function setAuthority(DSPause pause, address authority) public {
         pause.setAuthority(authority);
     }
 }
@@ -128,19 +127,19 @@ contract AdminScripts {
 contract Constructor is DSTest {
     function setUp() public {}
     function test_delay_set() public {
-        DSPause pause = new DSPause(100, address(0x0), new Authority());
+        DSPause pause = new DSPause(100, address(0x0), address(new Authority()));
         assertEq(pause.delay(), 100);
     }
 
     function test_owner_set() public {
-        DSPause pause = new DSPause(100, address(0xdeadbeef), new Authority());
+        DSPause pause = new DSPause(100, address(0xdeadbeef), address(new Authority()));
         assertEq(address(pause.owner()), address(0xdeadbeef));
     }
 
     function test_authority_set() public {
-        Authority authority = new Authority();
+        address authority = address(new Authority());
         DSPause pause = new DSPause(100, address(0x0), authority);
-        assertEq(address(pause.authority()), address(authority));
+        assertEq(pause.authority(), authority);
     }
 
 }
@@ -155,7 +154,7 @@ contract Admin is Test {
 
     function test_set_owner_with_delay() public {
         address      usr = address(new AdminScripts());
-        bytes32      tag = extcodehash(usr);
+        bytes32      tag = codehash(usr);
         bytes memory fax = abi.encodeWithSignature("setOwner(address,address)", pause, 0xdeadbeef);
         uint         eta = now + pause.delay();
 
@@ -169,14 +168,14 @@ contract Admin is Test {
     // --- authority ---
 
     function testFail_cannot_set_authority_without_delay() public {
-        pause.setAuthority(new Authority());
+        pause.setAuthority(address(new Authority()));
     }
 
     function test_set_authority_with_delay() public {
-        DSAuthority newAuthority = new Authority();
+        address newAuthority = address(new Authority());
 
         address      usr = address(new AdminScripts());
-        bytes32      tag = extcodehash(usr);
+        bytes32      tag = codehash(usr);
         bytes memory fax = abi.encodeWithSignature("setAuthority(address,address)", pause, newAuthority);
         uint         eta = now + pause.delay();
 
@@ -184,7 +183,7 @@ contract Admin is Test {
         hevm.warp(eta);
         pause.exec(usr, tag, fax, eta);
 
-        assertEq(address(pause.authority()), address(newAuthority));
+        assertEq(address(pause.authority()), newAuthority);
     }
 
     // --- delay ---
@@ -195,7 +194,7 @@ contract Admin is Test {
 
     function test_set_delay_with_delay() public {
         address      usr = address(new AdminScripts());
-        bytes32      tag = extcodehash(usr);
+        bytes32      tag = codehash(usr);
         bytes memory fax = abi.encodeWithSignature("setDelay(address,uint256)", pause, 0);
         uint         eta = now + pause.delay();
 
@@ -211,7 +210,7 @@ contract Plot is Test {
 
     function testFail_call_from_unauthorized() public {
         address      usr = target;
-        bytes32      tag = extcodehash(usr);
+        bytes32      tag = codehash(usr);
         bytes memory fax = abi.encodeWithSignature("get()");
         uint         eta = now + pause.delay();
 
@@ -220,7 +219,7 @@ contract Plot is Test {
 
     function testFail_plot_eta_too_soon() public {
         address      usr = target;
-        bytes32      tag = extcodehash(usr);
+        bytes32      tag = codehash(usr);
         bytes memory fax = abi.encodeWithSignature("get()");
         uint         eta = now;
 
@@ -229,7 +228,7 @@ contract Plot is Test {
 
     function test_plot_populates_plans_mapping() public {
         address      usr = target;
-        bytes32      tag = extcodehash(usr);
+        bytes32      tag = codehash(usr);
         bytes memory fax = abi.encodeWithSignature("get()");
         uint         eta = now + pause.delay();
 
@@ -245,7 +244,7 @@ contract Exec is Test {
 
     function testFail_delay_not_passed() public {
         address      usr = target;
-        bytes32      tag = extcodehash(usr);
+        bytes32      tag = codehash(usr);
         bytes memory fax = abi.encode(0);
         uint         eta = now + pause.delay();
 
@@ -255,7 +254,7 @@ contract Exec is Test {
 
     function testFail_double_execution() public {
         address      usr = target;
-        bytes32      tag = extcodehash(usr);
+        bytes32      tag = codehash(usr);
         bytes memory fax = abi.encodeWithSignature("get()");
         uint         eta = now + pause.delay();
 
@@ -278,7 +277,7 @@ contract Exec is Test {
 
     function testFail_exec_plan_with_proxy_ownership_change() public {
         address      usr = target;
-        bytes32      tag = extcodehash(usr);
+        bytes32      tag = codehash(usr);
         bytes memory fax = abi.encodeWithSignature("give(address)", address(this));
         uint         eta = now + pause.delay();
 
@@ -289,7 +288,7 @@ contract Exec is Test {
 
     function test_suceeds_when_delay_passed() public {
         address      usr = target;
-        bytes32      tag = extcodehash(usr);
+        bytes32      tag = codehash(usr);
         bytes memory fax = abi.encodeWithSignature("get()");
         uint         eta = now + pause.delay();
 
@@ -302,7 +301,7 @@ contract Exec is Test {
 
     function test_suceeds_when_called_from_unauthorized() public {
         address      usr = target;
-        bytes32      tag = extcodehash(usr);
+        bytes32      tag = codehash(usr);
         bytes memory fax = abi.encodeWithSignature("get()");
         uint         eta = now + pause.delay();
 
@@ -315,7 +314,7 @@ contract Exec is Test {
 
     function test_suceeds_when_called_from_authorized() public {
         address      usr = target;
-        bytes32      tag = extcodehash(usr);
+        bytes32      tag = codehash(usr);
         bytes memory fax = abi.encodeWithSignature("get()");
         uint         eta = now + pause.delay();
 
@@ -332,7 +331,7 @@ contract Drop is Test {
 
     function testFail_call_from_unauthorized() public {
         address      usr = target;
-        bytes32      tag = extcodehash(usr);
+        bytes32      tag = codehash(usr);
         bytes memory fax = abi.encodeWithSignature("get()");
         uint         eta = now + pause.delay();
 
@@ -344,7 +343,7 @@ contract Drop is Test {
 
     function test_drop_plotted_plan() public {
         address      usr = target;
-        bytes32      tag = extcodehash(usr);
+        bytes32      tag = codehash(usr);
         bytes memory fax = abi.encodeWithSignature("get()");
         uint         eta = now + pause.delay();
 

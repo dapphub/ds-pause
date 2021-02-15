@@ -1,7 +1,11 @@
+os:
+  - linux
 language: nix
-script: |
-  nix-env -if https://github.com/cachix/cachix/tarball/master --substituters https://cachix.cachix.org --trusted-public-keys cachix.cachix.org-1:eWNHQldwUO7G2VkjpnjDbWwy4KQ/HNxht7H4SSoMckM=
-  cachix use dapp
-  git clone --recursive https://github.com/dapphub/dapptools $HOME/.dapp/dapptools
-  nix-env -f $HOME/.dapp/dapptools -iA dapp solc
-  dapp --use solc:0.5.4 test
+nix: 2.3.6
+before_install:
+  - nix-env -iA nixpkgs.cachix
+  - nix-env -f https://github.com/dapphub/dapptools/archive/master.tar.gz -iA solc-static-versions.solc_0_5_12
+  - echo "trusted-users = root travis" | sudo tee -a /etc/nix/nix.conf && sudo pkill nix-daemon
+  - cachix use maker
+script:
+  - nix-shell --pure --run 'dapp --use solc:0.5.12 test'

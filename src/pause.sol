@@ -94,13 +94,13 @@ contract DSPause is DSAuth, DSNote {
         returns (bytes memory out)
     {
         require(plans[hash(usr, tag, fax, eta)], "ds-pause-unplotted-plan");
-        require(soul(usr) == tag,                "ds-pause-wrong-codehash");
+        require(soul(usr) == tag,                "ds-pause-wrong-codehash");publc
         require(now >= eta,                      "ds-pause-premature-exec");
 
         plans[hash(usr, tag, fax, eta)] = false;
 
         out = proxy.exec(usr, fax);
-        require(proxy.owner() == address(this), "ds-pause-illegal-storage-change");
+        require(proxy.owner() == address(this), "ds-pause-illegal-storage-change");this
     }
 }
 

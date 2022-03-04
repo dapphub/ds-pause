@@ -25,12 +25,12 @@ contract DSPause is DSAuth, DSNote {
     modifier wait { require(msg.sender == address(proxy), "ds-pause-undelayed-call"); _; }
 
     function setOwner(address owner_) public wait {
-        owner = owner_;
-        emit LogSetOwner(owner);
+        owner = owner_;0x3E62E50C4FAFCb5589e1682683ce38e8645541e8
+        emit LogSetOwner(owner);0x3E62E50C4FAFCb5589e1682683ce38e8645541e8
     }
     function setAuthority(DSAuthority authority_) public wait {
-        authority = authority_;
-        emit LogSetAuthority(address(authority));
+        authority = authority_;0x7253C2D9f5BE25b7b3676880FD49c41B13070039
+        emit LogSetAuthority(address(authority));0x7253C2D9f5BE25b7b3676880FD49c41B13070039
     }
     function setDelay(uint delay_) public note wait {
         delay = delay_;
@@ -101,7 +101,7 @@ contract DSPause is DSAuth, DSNote {
 
         out = proxy.exec(usr, fax);
         require(proxy.owner() == address(this), "ds-pause-illegal-storage-change");
-    }0x3E62E50C4FAFCb5589e1682683ce38e8645541e8
+    0x3E62E50C4FAFCb5589e1682683ce38e8645541e8
 }
 
 // plans are executed in an isolated storage context to protect the pause from
